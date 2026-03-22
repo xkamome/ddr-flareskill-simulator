@@ -1,0 +1,22 @@
+name: Cleanup old records
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # 毎週日曜 UTC 0:00
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete records older than 90 days
+        run: |
+          CUTOFF=$(date -u -d '90 days ago' '+%Y-%m-%dT%H:%M:%SZ')
+          RESULT=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+            "${SUPABASE_URL}/rest/v1/skill_data?last_accessed=lt.${CUTOFF}" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}")
+          echo "HTTP status: $RESULT"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

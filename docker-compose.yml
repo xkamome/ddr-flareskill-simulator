@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    ports:
+      - "9000:80"
+    volumes:
+      - ./config.js:/usr/share/nginx/html/config.js:ro
+    restart: unless-stopped

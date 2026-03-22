@@ -1,0 +1,6 @@
+*.env
+.env
+config.js
+node_modules/
+.claude/
+CLAUDE.md

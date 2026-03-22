@@ -1,0 +1,2372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DDR フレアスキル シミュレータ（ベータ版）</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root {
+  --header-h: 64px;
+  --import-h: 46px;
+  --sticky-top: calc(var(--header-h) + var(--import-h));
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', 'Inter', 'Arial', sans-serif;
+  background: #08080f;
+  color: #d8d8e8;
+  font-size: 13px;
+  zoom: 1.25;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+#header {
+  position: sticky; top: 0; z-index: 20;
+  background: linear-gradient(180deg, #0e0e20 0%, #090910 100%);
+  border-bottom: 1px solid #1a1a30;
+  padding: 10px 20px;
+  height: var(--header-h);
+  display: flex; align-items: center; gap: 18px;
+}
+#header h1 {
+  font-size: 16px; font-weight: 600; letter-spacing: 2px;
+  color: #b8b8d0; white-space: nowrap;
+}
+#header h1 span { color: #505080; }
+#hd-title-link { color: inherit; text-decoration: none; cursor: pointer; }
+#hd-title-link:hover { color: #d8d8f0; }
+.hd-block {
+  background: #0c0c1e; border: 1px solid #1e1e38; border-radius: 6px;
+  padding: 4px 14px; text-align: center;
+}
+.hd-block .val { font-size: 20px; font-weight: 700; letter-spacing: 1px; white-space: nowrap; }
+.hd-block .lbl { font-size: 10px; color: #484860; letter-spacing: 0.5px; margin-top: 1px; white-space: nowrap; }
+#hd-total .val { color: #48d898; }
+#hd-rank  .val { color: #c8a840; font-size: 13px; }
+#hd-next {
+  background: #0c0c1e; border: 1px solid #1e1e38; border-radius: 6px;
+  padding: 4px 14px; text-align: center; white-space: nowrap;
+}
+#hd-next .val { font-size: 14px; font-weight: 700; color: #484868; letter-spacing: 0.5px; }
+#hd-next .lbl { font-size: 10px; color: #2c2c44; letter-spacing: 0.5px; margin-top: 1px; }
+.hd-spacer { flex: 1; }
+#sim-badge {
+  background: #180808; border: 1px solid #3a1010; border-radius: 5px;
+  padding: 4px 12px; font-size: 10px; color: #c04040;
+  display: none; letter-spacing: 0.5px;
+}
+#sim-badge.on { display: block; }
+
+
+/* ── Import bar ── */
+#import-bar {
+  position: sticky; top: var(--header-h); z-index: 19;
+  background: #080810; border-bottom: 1px solid #121222;
+  padding: 7px 20px; height: var(--import-h);
+  display: flex; align-items: center; gap: 10px;
+}
+#import-bar label { font-size: 10px; color: #404058; white-space: nowrap; letter-spacing: 0.5px; }
+.btn-sm {
+  background: #101020; border: 1px solid #222240; color: #5858a0;
+  padding: 6px 16px; border-radius: 4px; cursor: pointer;
+  font-size: 12px; white-space: nowrap; transition: all 0.2s;
+}
+.btn-sm:hover { background: #161628; color: #7878c0; }
+.btn-sm.btn-green { background: #0a1a0c; border-color: #183018; color: #488048; }
+.btn-sm.btn-green:hover { background: #0e2210; color: #60a060; }
+#btn-import-sep { border-right: 1px solid #1e1e30; margin-right: 8px; padding-right: 8px; }
+#hd-style-wrap { display:flex; align-items:center; }
+#hd-style-badge {
+  background:#0c0c1e; border:1px solid #1e1e38; border-radius:6px;
+  padding:4px 14px; font-size:14px; font-weight:700; letter-spacing:1px; color:#5858a0;
+}
+.btn-style {
+  background:#0c0c1e; border:1px solid #1e1e38; color:#404060;
+  padding:5px 12px; cursor:pointer; font-size:13px; font-weight:700; transition:all 0.2s;
+}
+.btn-style:first-child { border-radius:6px 0 0 6px; }
+.btn-style:last-child  { border-radius:0 6px 6px 0; border-left:none; }
+.btn-style.active { background:#141428; color:#8080c0; border-color:#303060; }
+.btn-style:hover:not(.active) { background:#101020; color:#606080; }
+#import-status { font-size: 10px; color: #404058; white-space: nowrap; }
+#import-status.error { color: #c04848; font-size: 12px; font-weight: 600; }
+
+/* ── Empty banner ── */
+#empty-banner {
+  display: none;
+  background: #0d0a06; border-bottom: 1px solid #3a2a10;
+  padding: 28px 24px; text-align: center;
+}
+#empty-banner.on { display: block; }
+.empty-title { font-size: 16px; font-weight: 700; color: #c87830; margin-bottom: 10px; }
+.empty-desc { font-size: 12px; color: #705030; line-height: 1.8; }
+.empty-desc strong { color: #a06030; }
+#import-hint {
+  display: none;
+  background: #0a0a10; border-bottom: 1px solid #1a1a2e;
+  padding: 5px 20px; font-size: 10px; color: #404060;
+}
+#import-hint.on { display: block; }
+#import-hint strong { color: #505080; }
+
+/* ── Main layout ── */
+#main { display: flex; align-items: flex-start; }
+
+/* ── Center: 3 columns ── */
+#center { flex: 1; display: flex; min-width: 0; }
+
+.cat-col {
+  flex: 1; display: flex; flex-direction: column; min-width: 0;
+  border-right: 1px solid #1a1a28; overflow: visible;
+}
+.cat-col:last-child { border-right: none; }
+.cat-col.classic { background: rgba(140, 70, 15, 0.18); }
+.cat-col.white   { background: rgba(160, 160, 200, 0.10); }
+.cat-col.gold    { background: rgba(210, 130, 0, 0.20); }
+
+.cat-head {
+  padding: 8px 10px; font-weight: 600; font-size: 11px;
+  letter-spacing: 1.5px; border-bottom: 1px solid #1e1e2e;
+  display: flex; justify-content: space-between; align-items: center;
+  background: #0a0a14; position: sticky; top: var(--sticky-top); z-index: 10;
+}
+.cat-head.classic { color: #b07040; border-left: 3px solid #703010; }
+.cat-head.white   { color: #8888a8; border-left: 3px solid #404068; }
+.cat-head.gold    { color: #c0980a; border-left: 3px solid #785800; }
+.cat-head .cat-fs { font-size: 13px; color: #48d898; font-weight: 700; letter-spacing: 0; }
+.cat-head .cat-delta { font-size: 10px; margin-left: 5px; }
+
+table.st { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.st th {
+  background: #0a0a14; color: #505068; padding: 4px 5px;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.5px; text-align: left;
+  border-bottom: 1px solid #101020;
+  position: sticky; top: calc(var(--sticky-top) + 38px); z-index: 9;
+}
+table.st td { padding: 4px 5px; border-bottom: 1px solid #141422; vertical-align: middle; white-space: nowrap; }
+table.st tr:hover td { background: rgba(255,255,255,0.03); }
+table.st tr.row-clickable { cursor: pointer; }
+table.st tr.sim-in  td { background: rgba(40,180,80,0.15) !important; }
+table.st tr.sim-in  td:first-child { border-left: 3px solid #30b060; }
+table.st tr.sim-out td { background: rgba(180,50,50,0.12) !important; opacity: 0.6; text-decoration: line-through; }
+table.st tr.sim-mod td { background: rgba(190,220,40,0.15) !important; }
+table.st tr.sim-mod td:first-child { border-left: 3px solid #b8d828; }
+table.st th:nth-child(1), table.st td:nth-child(1) { width: 22px; text-align: right; }
+table.st th:nth-child(2), table.st td:nth-child(2) { width: auto; }
+table.st th:nth-child(3), table.st td:nth-child(3) { width: 36px; }
+table.st th:nth-child(4), table.st td:nth-child(4) { width: 24px; text-align: center; }
+table.st th:nth-child(5), table.st td:nth-child(5) { width: 50px; }
+table.st th:nth-child(6), table.st td:nth-child(6) { width: 38px; text-align: right; }
+
+.pos  { color: #404060; font-size: 10px; }
+.pos.has-note { color: #804848; }
+.sname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.diff-CSP,.diff-CDP { color: #9060c8; font-size: 10px; }
+.diff-ESP,.diff-EDP { color: #40a868; font-size: 10px; }
+.diff-DSP,.diff-DDP { color: #c04848; font-size: 10px; }
+.diff-BSP,.diff-BDP { color: #b0a030; font-size: 10px; }
+.diff-bSP            { color: #606060; font-size: 10px; }
+
+.rb { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.rb-EX {
+  background: linear-gradient(90deg, #e85050 0%, #e8a030 25%, #70d060 50%, #3898e8 75%, #b060e8 100%);
+  color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+}
+.rb-IX   { background: linear-gradient(135deg,#0a0800,#181200); border: 1px solid #705800; color: #b89010; }
+.rb-VIII { background: #0e1c2c; border: 1px solid #1c3850; color: #4888b8; }
+.rb-VII  { background: #0c1828; border: 1px solid #183050; color: #3868a0; }
+.rb-VI   { background: #0a1220; border: 1px solid #122840; color: #2a5080; }
+.rb-V    { background: #090e18; border: 1px solid #0e2030; color: #224060; }
+.rb-IV   { background: #101018; border: 1px solid #1e1e30; color: #484860; }
+.rb-III  { background: #0e0e14; border: 1px solid #181828; color: #383850; }
+.rb-II   { background: #0c0c12; border: 1px solid #141420; color: #2e2e40; }
+.rb-I    { background: #0a0a10; border: 1px solid #101018; color: #242434; }
+.rb-none { background: #08080e; color: #1e1e2c; }
+
+.fsv { font-weight: 700; color: #48d898; text-align: right; font-size: 12px; }
+.lv  { color: #707088; font-size: 11px; }
+
+/* ── Right pane ── */
+#right {
+  width: 360px; flex-shrink: 0;
+  background: #07070d; border-left: 1px solid #101018;
+  position: sticky; top: var(--sticky-top);
+  height: calc(100vh - var(--sticky-top));
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#rpane-body { flex: 1; overflow-y: auto; padding: 12px; }
+
+/* ── Sim pane ── */
+.mode-row { display: flex; gap: 5px; margin-bottom: 12px; }
+.mode-btn {
+  flex: 1; padding: 6px; border: 1px solid #181828; border-radius: 4px;
+  background: #0b0b16; color: #383850; cursor: pointer; text-align: center;
+  font-size: 12px; letter-spacing: 0.3px; transition: all 0.2s;
+}
+.mode-btn.on { background: #101020; color: #7878a8; border-color: #242448; }
+.mode-btn:hover:not(.on) { background: #0d0d1c; }
+
+.fg { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.fg label { font-size: 11px; color: #404058; letter-spacing: 0.3px; }
+.fg input, .fg select {
+  background: #0b0b18; border: 1px solid #1a1a30; color: #b0b0c8;
+  padding: 5px 7px; border-radius: 4px; font-size: 12px; width: 100%; transition: border-color 0.2s;
+}
+.fg input:focus, .fg select:focus { outline: none; border-color: #282850; }
+.frow { display: flex; gap: 6px; }
+.frow .fg { flex: 1; }
+
+.btn-add {
+  width: 100%; padding: 7px; border-radius: 4px; cursor: pointer;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+  transition: all 0.2s; margin-bottom: 8px;
+  background: #091408; border: 1px solid #162814; color: #487848;
+}
+.btn-add:hover { background: #0c1c0a; color: #60a060; }
+.btn-add.editing { background: #140e08; border-color: #281e10; color: #786040; }
+.btn-add.editing:hover { background: #1c1408; color: #a08048; }
+
+/* Sim pending list */
+.sim-pending-list { margin-bottom: 4px; }
+.sim-pending-item {
+  background: #0b0b18; border: 1px solid #181828; border-radius: 4px;
+  padding: 5px 8px; margin-bottom: 4px;
+  display: flex; align-items: center; gap: 6px; font-size: 12px;
+}
+.sim-pending-item.active { border-color: #282848; background: #0d0d20; }
+.spi-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8080a0; }
+.spi-info { color: #404060; white-space: nowrap; font-size: 11px; }
+.spi-btn {
+  background: none; border: none; cursor: pointer; color: #303050;
+  padding: 1px 4px; border-radius: 3px; font-size: 12px; transition: color 0.15s; line-height: 1;
+}
+.spi-btn:hover { color: #7070a0; }
+.spi-btn.del:hover { color: #a04040; }
+
+/* Sim result */
+#sim-result { margin-top: 8px; }
+.sr-block {
+  background: #0a0a16; border: 1px solid #121228; border-radius: 5px;
+  padding: 10px 12px; margin-bottom: 8px;
+}
+.sr-delta { text-align: center; margin-bottom: 6px; }
+.sr-delta .dv { font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+.sr-delta .dl { font-size: 11px; color: #404058; letter-spacing: 0.5px; }
+.dv.pos { color: #48d898; }
+.dv.neg { color: #d84848; }
+.dv.zer { color: #383858; }
+.sr-rank { text-align: center; font-size: 12px; color: #b89830; margin-bottom: 8px; }
+.sr-catline { display: flex; justify-content: space-between; font-size: 12px; color: #484860; padding: 2px 0; }
+.cd.pos { color: #48d898; font-weight: 700; }
+.cd.neg { color: #d84848; font-weight: 700; }
+.cd.zer { color: #383858; }
+
+.prog-wrap { margin-bottom: 8px; }
+.prog-lbl  { font-size: 11px; color: #484860; margin-bottom: 4px; }
+.prog-bar  { background: #0d0d1a; border-radius: 3px; height: 4px; overflow: hidden; margin-bottom: 3px; }
+.prog-fill { height: 100%; background: linear-gradient(90deg, #283870, #4858a8); border-radius: 3px; transition: width 0.4s; }
+.prog-pct  { font-size: 11px; color: #383870; text-align: right; }
+
+.sr-changes { background: #0a0a16; border: 1px solid #121228; border-radius: 5px; padding: 8px 10px; }
+.sr-ch-title { font-size: 11px; color: #383858; letter-spacing: 0.5px; margin-bottom: 5px; }
+.sr-change { padding: 3px 0; border-bottom: 1px solid #0d0d18; display: flex; justify-content: space-between; gap: 6px; font-size: 12px; }
+.sr-change:last-child { border-bottom: none; }
+.sr-change .ch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.sr-change .ch-val  { white-space: nowrap; }
+.sr-change.add { color: #488048; }
+.sr-change.rem { color: #804848; }
+.sr-change.mod { color: #786040; }
+.sr-nochange { color: #383858; font-size: 12px; text-align: center; padding: 4px 0; }
+
+/* ── Stats pane ── */
+.stats-cat { margin-bottom: 16px; }
+.stats-cat-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+  margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #121220;
+}
+.stats-cat-title.classic { color: #b07040; }
+.stats-cat-title.white   { color: #606088; }
+.stats-cat-title.gold    { color: #b89010; }
+
+table.stats-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.stats-tbl th {
+  color: #383858; font-weight: 500; font-size: 11px; letter-spacing: 0.3px;
+  padding: 3px 5px; border-bottom: 1px solid #101020; text-align: right;
+}
+table.stats-tbl th:first-child { text-align: left; }
+table.stats-tbl td {
+  padding: 3px 5px; border-bottom: 1px solid #0d0d18; text-align: right; color: #606080;
+}
+table.stats-tbl td:first-child { text-align: left; color: #505070; }
+table.stats-tbl td.sv-cur { color: #48d898; font-weight: 700; }
+table.stats-tbl td.sv-sim { color: #70a0e0; font-weight: 700; }
+table.stats-tbl td.sv-dlt { color: #b89030; }
+table.stats-tbl td.sv-dlt.pos { color: #48d898; }
+table.stats-tbl td.sv-dlt.neg { color: #d84848; }
+
+/* ── Modals ── */
+#uuid-modal, #ttl-modal, #help-modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.75); z-index: 100;
+  align-items: center; justify-content: center;
+}
+#uuid-modal.on, #ttl-modal.on, #help-modal.on { display: flex; }
+.modal-box.help-modal-box { width: min(920px, 62vw); max-height: 82vh; display:flex; flex-direction:column; text-align:left; }
+.help-content { overflow-y: auto; flex: 1; padding-right: 6px; margin-bottom: 16px; text-align: left; }
+.help-content::-webkit-scrollbar { width: 4px; }
+.help-content::-webkit-scrollbar-track { background: #0a0a18; }
+.help-content::-webkit-scrollbar-thumb { background: #282840; border-radius: 2px; }
+.help-section { margin-bottom: 18px; }
+.help-section h3 { font-size: 11px; font-weight: 700; color: #5858a0; letter-spacing: 1.5px; text-transform: uppercase; border-bottom: 1px solid #14142a; padding-bottom: 5px; margin-bottom: 8px; }
+.help-section p, .help-section li { font-size: 12px; color: #a0a0c0; line-height: 1.75; text-align: left; }
+.help-section ul { padding-left: 16px; margin: 4px 0; }
+.help-section li { margin-bottom: 2px; }
+.help-section strong { color: #c8c8e0; }
+.bml-copy-box {
+  background: #07070e; border: 1px solid #141428; border-radius: 5px;
+  padding: 8px 10px; font-family: monospace; font-size: 10px; color: #5050a0;
+  word-break: break-all; margin: 8px 0; max-height: 72px; overflow-y: auto;
+  line-height: 1.5; user-select: all; cursor: text;
+}
+.bml-copy-btn {
+  background: #0c1a28; border: 1px solid #182e48; color: #4880b0;
+  padding: 5px 16px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  font-weight: 600; transition: all 0.2s; margin-top: 4px;
+}
+.bml-copy-btn:hover { background: #101e30; color: #60a0d0; }
+.bml-copy-btn.copied { background: #0a1a0c; border-color: #183018; color: #60a060; }
+.help-credit { font-size: 11px; color: #404060; text-align: center; border-top: 1px solid #14142a; padding-top: 12px; margin-top: 4px; line-height: 1.9; }
+.help-credit a { color: #5858a0; text-decoration: none; }
+.help-credit a:hover { color: #8080c0; }
+#btn-help { background: #0c0c20; border: 1px solid #1e1e38; border-radius: 5px; color: #5858a0; font-size: 13px; font-weight: 600; padding: 6px 14px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+#btn-help:hover { background: #10102a; color: #8080c0; }
+.modal-box {
+  background: #0d0d1e; border: 1px solid #1e1e38; border-radius: 8px;
+  padding: 28px 32px; width: 440px; text-align: center;
+}
+.modal-box h2 { font-size: 16px; font-weight: 600; color: #b8b8d0; margin-bottom: 6px; }
+.modal-box p  { font-size: 12px; color: #484860; margin-bottom: 18px; }
+.modal-url {
+  background: #07070e; border: 1px solid #141428; border-radius: 5px;
+  padding: 10px 14px; font-family: monospace; font-size: 11px; color: #6060a0;
+  word-break: break-all; margin-bottom: 16px; text-align: left;
+}
+.modal-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.btn-modal { padding: 7px 20px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+.btn-copy  { background: #0c1a28; border: 1px solid #182e48; color: #4880b0; }
+.btn-copy:hover  { background: #101e30; color: #60a0d0; }
+.btn-close { background: #121220; border: 1px solid #1e1e30; color: #505068; }
+.btn-close:hover { background: #181828; color: #707088; }
+.btn-modal-green { background: #0a1a0c; border: 1px solid #183018; color: #488048; }
+.btn-modal-green:hover { background: #0e2210; color: #60a060; }
+.btn-x { background: #0a0a0a; border: 1px solid #282828; color: #909090; }
+.btn-x:hover { background: #111; color: #c0c0c0; }
+#copy-feedback { font-size: 11px; color: #48d898; margin-top: 8px; height: 16px; }
+
+/* ── Target skill ── */
+#target-section { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #101018; }
+#target-display { display:none; text-align:center; padding:10px 12px; margin-bottom:10px; background:#0a0a16; border:1px solid #1a1428; border-radius:5px; }
+#target-display .td-lbl { font-size:10px; color:#484860; letter-spacing:0.5px; margin-bottom:3px; }
+#target-display .td-val { font-size:26px; font-weight:700; letter-spacing:1px; display:inline-block; }
+#target-display .td-rank { font-size:13px; margin-top:2px; }
+#target-display .td-diff { font-size:12px; margin-top:5px; }
+.target-input-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.target-input-row label { font-size: 11px; color: #404058; white-space: nowrap; }
+#target-val {
+  flex: 1; background: #0b0b18; border: 1px solid #1a1a30; color: #b0b0c8;
+  padding: 5px 7px; border-radius: 4px; font-size: 12px; min-width: 0; transition: border-color 0.2s;
+}
+#target-val:focus { outline: none; border-color: #282850; }
+#btn-target-clear {
+  background: none; border: none; cursor: pointer; color: #303050;
+  padding: 2px 6px; font-size: 13px; line-height: 1; flex-shrink: 0; transition: color 0.15s;
+}
+#btn-target-clear:hover { color: #a04040; }
+.target-presets { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.target-presets-row { display: flex; gap: 4px; }
+.target-preset {
+  background: #0b0b18; border: 1px solid #181828; color: #404060;
+  padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;
+  white-space: nowrap; transition: all 0.15s;
+}
+.target-preset:hover { background: #0f0f22; color: #6060a0; border-color: #222248; }
+.target-preset.active { background: #101022; border-color: #242450; color: #7070b0; }
+#target-result { font-size: 13px; color: #505070; text-align: center; min-height: 20px; }
+#target-result .tr-reach { color: #48d898; font-weight: 700; }
+#target-result .tr-val { color: #c8a840; font-weight: 700; font-size: 18px; }
+
+/* ── Delete button ── */
+.btn-del {
+  padding: 7px 10px; border-radius: 4px; cursor: pointer;
+  font-size: 12px; font-weight: 600; transition: all 0.2s; margin-bottom: 8px;
+  background: #140808; border: 1px solid #281010; color: #783838; white-space: nowrap;
+}
+.btn-del:hover { background: #1c0808; color: #a04848; }
+
+#sim-color-toggle-row {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 10px; font-size: 11px; color: #404058;
+}
+#sim-color-toggle-row label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
+#chk-sim-colors { cursor: pointer; accent-color: #484880; }
+
+/* ── Note dot ── */
+/* ── Candidate section (center) ── */
+.cand-section { margin-top: 12px; border-top: 1px dashed #252540; }
+.cand-head { padding: 5px 10px; font-size: 10px; font-weight: 600; color: #5050a0; letter-spacing: 1.5px; }
+.tier-badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.tier-SOON { background: #1a0808; border: 1px solid #3a1010; color: #c04040; }
+.tier-MID  { background: #181008; border: 1px solid #382010; color: #b07030; }
+.tier-LONG { background: #080e1a; border: 1px solid #102038; color: #4070b0; }
+/* cand-tbl: 7列（●/楽曲名/TIER/難/Lv/ランク/FS） */
+table.cand-tbl th:nth-child(1),table.cand-tbl td:nth-child(1){width:18px;text-align:center;}
+table.cand-tbl th:nth-child(2),table.cand-tbl td:nth-child(2){width:auto;}
+table.cand-tbl th:nth-child(3),table.cand-tbl td:nth-child(3){width:44px;}
+table.cand-tbl th:nth-child(4),table.cand-tbl td:nth-child(4){width:36px;}
+table.cand-tbl th:nth-child(5),table.cand-tbl td:nth-child(5){width:24px;text-align:center;}
+table.cand-tbl th:nth-child(6),table.cand-tbl td:nth-child(6){width:50px;}
+table.cand-tbl th:nth-child(7),table.cand-tbl td:nth-child(7){width:38px;text-align:right;}
+
+/* ── Note section ── */
+#note-section, #cand-note-section { margin-bottom: 8px; padding: 8px 0 4px; border-top: 1px solid #101018; }
+.note-label { font-size: 11px; color: #383858; letter-spacing: 0.5px; margin-bottom: 4px; }
+#note-area, #cand-note-area {
+  width: 100%; background: #0b0b18; border: 1px solid #1a1a30; color: #b0b0c8;
+  padding: 6px 8px; border-radius: 4px; font-size: 12px; font-family: inherit;
+  resize: vertical; min-height: 48px; max-height: 120px; line-height: 1.5;
+  transition: border-color 0.2s;
+}
+#note-area:focus, #cand-note-area:focus { outline: none; border-color: #282850; }
+#note-area::placeholder { color: #282840; }
+
+/* ── Comment ── */
+#sim-comment-section { margin-bottom: 8px; }
+.comment-label { font-size: 11px; color: #383858; letter-spacing: 0.5px; margin-bottom: 4px; }
+#sim-comment-area {
+  width: 100%; background: #0b0b18; border: 1px solid #1a1a30; color: #b0b0c8;
+  padding: 6px 8px; border-radius: 4px; font-size: 12px; font-family: inherit;
+  resize: vertical; min-height: 56px; max-height: 160px; line-height: 1.5;
+  transition: border-color 0.2s;
+}
+#sim-comment-area:focus { outline: none; border-color: #282850; }
+#sim-comment-area::placeholder { color: #282840; }
+.comment-count { font-size: 10px; color: #2e2e48; text-align: right; margin-top: 2px; }
+.comment-count.near { color: #786828; }
+.comment-count.full { color: #904040; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #07070e; }
+::-webkit-scrollbar-thumb { background: #161628; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #1e1e34; }
+
+/* ── Mobile (≤768px) ── */
+@media (max-width: 768px) {
+  :root { --mob-header-h: 48px; }
+
+  /* Header: title only */
+  #header {
+    height: var(--mob-header-h); min-height: var(--mob-header-h);
+    padding: 0 14px; gap: 0;
+  }
+  #header h1 { font-size: 13px; flex: 1; }
+  body { zoom: 1; }
+  #hd-total, #hd-rank, #hd-next, #hd-spacer, #sim-badge, #btn-reset, #hd-style-wrap { display: none; }
+  #btn-help { padding: 4px 10px; font-size: 11px; }
+
+  /* Import bar: static, single row with scroll */
+  #import-bar {
+    position: static; height: auto;
+    flex-wrap: nowrap; overflow-x: auto; padding: 6px 12px 0; gap: 6px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
+  }
+  /* Main: vertical */
+  #main { flex-direction: column; }
+
+  /* Center: stack columns */
+  #center { flex-direction: column; width: 100%; }
+  .cat-col { border-right: none; border-bottom: 1px solid #101018; width: 100%; padding: 0 5px; }
+  #hd-uuid { display: none !important; }
+  .cat-col:last-child { border-bottom: none; }
+
+  /* Cat head: sticky per-column, clickable */
+  .cat-head {
+    position: sticky; top: var(--mob-header-h);
+    cursor: pointer; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cat-toggle-icon {
+    display: inline-block; width: 10px;
+    font-size: 9px; color: #404060; margin-right: 3px;
+    transition: transform 0.2s; transform: rotate(0deg);
+  }
+  .cat-col.collapsed .cat-toggle-icon { transform: rotate(-90deg); }
+  .cat-col.collapsed table,
+  .cat-col.collapsed .cand-section { display: none; }
+
+  /* Table th: not sticky */
+  table.st th { position: static; }
+
+  /* Candidate section: collapsible */
+  .cand-head {
+    cursor: pointer; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 10px;
+  }
+  .cand-toggle-icon {
+    font-size: 9px; color: #404060;
+    transition: transform 0.2s; transform: rotate(-90deg);
+    flex-shrink: 0; margin-left: 4px;
+  }
+  .cand-section.cand-open .cand-toggle-icon { transform: rotate(0deg); }
+  .cand-section:not(.cand-open) table.cand-tbl { display: none; }
+
+  /* Right pane: fixed drawer from right */
+  #right {
+    position: fixed; top: 0; right: 0;
+    width: 85vw; height: 100vh;
+    z-index: 50; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    border-left: 1px solid #1a1a30;
+  }
+  #right.mob-open { transform: translateX(0); }
+  #rpane-body { overflow-y: auto; }
+
+  /* Mob rpane close bar */
+  #mob-rpane-close {
+    display: flex !important;
+    align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-bottom: 1px solid #101018;
+    background: #0a0a14; flex-shrink: 0;
+  }
+  #mob-rpane-close .mob-close-title {
+    font-size: 11px; color: #383858; letter-spacing: 1.5px;
+  }
+  #mob-rpane-close .mob-close-btn {
+    background: none; border: none; color: #606080;
+    font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;
+  }
+
+  /* Mobile stats at top of rpane */
+  #mob-stats {
+    display: block !important;
+    padding: 12px; border-bottom: 1px solid #101018;
+  }
+  .mob-stat-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  .mob-stat-block {
+    flex: 1; background: #0c0c1e; border: 1px solid #1e1e38;
+    border-radius: 5px; padding: 5px 8px; text-align: center;
+  }
+  .mob-stat-block .val { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+  .mob-stat-block .lbl { font-size: 9px; color: #484860; letter-spacing: 0.5px; margin-top: 1px; }
+  #mob-hd-total .val { color: #48d898; }
+  #mob-hd-rank  .val { color: #c8a840; font-size: 11px; }
+  .mob-next-row { font-size: 11px; color: #484868; text-align: center; margin-bottom: 6px; }
+  .mob-sim-controls { display: flex; gap: 6px; align-items: center; justify-content: center; }
+  #mob-sim-badge {
+    background: #180808; border: 1px solid #3a1010; border-radius: 5px;
+    padding: 3px 10px; font-size: 10px; color: #c04040; letter-spacing: 0.5px;
+    display: none;
+  }
+  #mob-sim-badge.on { display: block; }
+  #mob-btn-reset {
+    background: #121220; border: 1px solid #282840; color: #606080;
+    padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 11px;
+    display: none;
+  }
+  #mob-btn-reset.on { display: block; }
+  .mob-style-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
+  #mob-style-badge { background:#0c0c1e; border:1px solid #1e1e38; border-radius:6px; padding:3px 12px; font-size:13px; font-weight:700; letter-spacing:1px; color:#5858a0; display:none; }
+  #mob-uuid-display { font-size: 10px; color: #505080; font-family: monospace; letter-spacing: 0.5px; text-align: center; margin-top: 4px; display: none; }
+
+  /* FAB */
+  #mob-fab {
+    display: flex !important;
+    position: fixed; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); right: 16px; z-index: 48;
+    width: 48px; height: 48px;
+    background: #0e0e22; border: 1px solid #242448; border-radius: 50%;
+    align-items: center; justify-content: center;
+    cursor: pointer; font-size: 20px; color: #6060a0;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.7);
+    transition: background 0.2s, color 0.2s;
+  }
+  #mob-fab.active { background: #1a1a38; color: #a0a0d0; border-color: #404080; }
+
+  /* Overlay */
+  #mob-overlay {
+    display: none; position: fixed; inset: 0; z-index: 49;
+    background: rgba(0,0,0,0.65);
+  }
+  #mob-overlay.on { display: block; }
+
+  /* Footer spacer so FAB doesn't cover last row */
+  #mob-footer { display: block; height: calc(80px + env(safe-area-inset-bottom, 0px)); flex-shrink: 0; }
+
+  /* Prevent iOS auto-zoom on inputs */
+  .fg input, .fg select, #target-val, #note-area, #sim-comment-area { font-size: 16px; }
+
+  /* Touch targets */
+  .btn-sm { min-height: 36px; }
+  .mode-btn, .btn-add, .btn-del { min-height: 40px; }
+
+  /* Modal */
+  .modal-box { width: 94%; padding: 20px 16px; }
+  .modal-box.help-modal-box { width: 94%; max-height: 80vh; }
+}
+
+/* PC: hide mobile-only elements */
+@media (min-width: 769px) {
+  #mob-fab, #mob-overlay, #mob-rpane-close, #mob-stats, #mob-footer { display: none; }
+  .cat-toggle-icon, .cand-toggle-icon { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div style="display:flex;flex-direction:column;">
+    <h1><a href="javascript:void(0)" id="hd-title-link" onclick="goHome()">DDR <span>//</span> FLARE SKILL SIMULATOR</a></h1>
+    <span style="font-size:9px;color:#303050;letter-spacing:0.5px;text-align:right;">dev by @harug_game</span>
+  </div>
+  <div class="hd-block" id="hd-total">
+    <div class="val" id="hd-total-val">--</div>
+    <div class="lbl">TOTAL FLARE SKILL</div>
+  </div>
+  <div class="hd-block" id="hd-rank">
+    <div class="val" id="hd-rank-val">--</div>
+    <div class="lbl">RANK</div>
+  </div>
+  <div id="hd-next"><div class="val" id="hd-next-val">--</div><div class="lbl" id="hd-next-lbl">NEXT RANK</div></div>
+  <div class="hd-spacer"></div>
+  <button id="btn-help" onclick="openHelp()">使い方</button>
+  <div id="hd-style-wrap">
+    <div id="hd-style-badge" style="display:none"></div>
+    <div id="hd-style-toggle" style="display:none">
+      <button id="btn-style-sp" class="btn-style active" onclick="setSessionStyle('SP')">SP</button>
+      <button id="btn-style-dp" class="btn-style" onclick="setSessionStyle('DP')">DP</button>
+    </div>
+  </div>
+  <div id="hd-uuid" style="display:none;flex-shrink:0;"><span id="hd-uuid-val" style="font-size:10px;font-family:monospace;letter-spacing:0.5px;color:#5858a0;white-space:nowrap;"></span></div>
+  <div id="sim-badge">SIM ACTIVE</div>
+</div>
+
+<div id="import-bar">
+  <span id="import-status"></span>
+  <div style="flex:1"></div>
+  <button class="btn-sm" id="btn-import-sep" onclick="triggerJSONImport()">JSON読込</button>
+  <input type="file" id="json-file-input" accept=".json" style="display:none" onchange="importJSONFile(this)">
+  <button class="btn-sm btn-green" id="btn-json-dl" onclick="downloadJSON()">JSONとしてDL</button>
+  <button class="btn-sm btn-green" id="btn-image" onclick="saveAsImage()">画像としてDL</button>
+  <button class="btn-sm btn-green" id="btn-save" onclick="saveToSupabase()" style="display:none">保存</button>
+</div>
+
+<div id="empty-banner">
+  <div class="empty-title">⚠ データがありません</div>
+  <div class="empty-desc">
+    <strong>ログイン状態でフレアスキル対象楽曲ページにアクセスし、ブックマークレットを実行してください。</strong><br>
+    または JSONとしてDL で保存したファイルを <strong>JSON読込</strong> してください。<br>
+    右パネルの<strong>新規追加</strong>からスコアを入力してシミュレーションを開始することもできます。
+  </div>
+</div>
+<div id="import-hint">
+  スコアデータなし — <strong>ブックマークレット</strong>を実行または <strong>JSON読込</strong> でインポートできます
+</div>
+
+<div id="main">
+  <div id="center">
+    <div class="cat-col classic">
+      <div class="cat-head classic" onclick="toggleCat('classic')">
+        <span><span class="cat-toggle-icon">▼</span>CLASSIC</span>
+        <span><span class="cat-fs" id="fs-classic">--</span><span class="cat-delta" id="d-classic"></span></span>
+      </div>
+      <table class="st" id="tbl-classic">
+        <thead><tr><th>#</th><th>楽曲名</th><th>難</th><th>Lv</th><th>ランク</th><th>FS</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="cand-section" id="cand-classic" style="display:none">
+        <div class="cand-head" id="cand-head-classic" onclick="toggleCandSection('classic')"><span>CANDIDATES</span><span class="cand-toggle-icon"></span></div>
+        <table class="st cand-tbl"><thead><tr><th>●</th><th>楽曲名</th><th>TIER</th><th>難</th><th>Lv</th><th>ランク</th><th>FS</th></tr></thead><tbody id="cand-tbody-classic"></tbody></table>
+      </div>
+    </div>
+    <div class="cat-col white">
+      <div class="cat-head white" onclick="toggleCat('white')">
+        <span><span class="cat-toggle-icon">▼</span>WHITE</span>
+        <span><span class="cat-fs" id="fs-white">--</span><span class="cat-delta" id="d-white"></span></span>
+      </div>
+      <table class="st" id="tbl-white">
+        <thead><tr><th>#</th><th>楽曲名</th><th>難</th><th>Lv</th><th>ランク</th><th>FS</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="cand-section" id="cand-white" style="display:none">
+        <div class="cand-head" id="cand-head-white" onclick="toggleCandSection('white')"><span>CANDIDATES</span><span class="cand-toggle-icon"></span></div>
+        <table class="st cand-tbl"><thead><tr><th>●</th><th>楽曲名</th><th>TIER</th><th>難</th><th>Lv</th><th>ランク</th><th>FS</th></tr></thead><tbody id="cand-tbody-white"></tbody></table>
+      </div>
+    </div>
+    <div class="cat-col gold">
+      <div class="cat-head gold" onclick="toggleCat('gold')">
+        <span><span class="cat-toggle-icon">▼</span>GOLD</span>
+        <span><span class="cat-fs" id="fs-gold">--</span><span class="cat-delta" id="d-gold"></span></span>
+      </div>
+      <table class="st" id="tbl-gold">
+        <thead><tr><th>#</th><th>楽曲名</th><th>難</th><th>Lv</th><th>ランク</th><th>FS</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="cand-section" id="cand-gold" style="display:none">
+        <div class="cand-head" id="cand-head-gold" onclick="toggleCandSection('gold')"><span>CANDIDATES</span><span class="cand-toggle-icon"></span></div>
+        <table class="st cand-tbl"><thead><tr><th>●</th><th>楽曲名</th><th>TIER</th><th>難</th><th>Lv</th><th>ランク</th><th>FS</th></tr></thead><tbody id="cand-tbody-gold"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div id="mob-rpane-close">
+      <span class="mob-close-title">SIMULATOR</span>
+      <button class="mob-close-btn" onclick="closeMobRpane()">✕</button>
+    </div>
+    <div id="rpane-body">
+
+      <div id="mob-stats">
+        <div class="mob-stat-row">
+          <div class="mob-stat-block" id="mob-hd-total">
+            <div class="val" id="mob-hd-total-val">--</div>
+            <div class="lbl">TOTAL FLARE SKILL</div>
+          </div>
+          <div class="mob-stat-block" id="mob-hd-rank">
+            <div class="val" id="mob-hd-rank-val">--</div>
+            <div class="lbl">RANK</div>
+          </div>
+        </div>
+        <div class="mob-next-row">
+          <span id="mob-hd-next-val">--</span>
+          <span id="mob-hd-next-lbl" style="color:#303048;margin-left:4px;">NEXT RANK</span>
+        </div>
+        <div class="mob-style-row">
+          <div id="mob-style-badge"></div>
+          <div id="mob-style-toggle" style="display:none">
+            <button class="btn-style active" id="mob-btn-style-sp" onclick="setSessionStyle('SP')">SP</button>
+            <button class="btn-style" id="mob-btn-style-dp" onclick="setSessionStyle('DP')">DP</button>
+          </div>
+        </div>
+        <div class="mob-sim-controls">
+          <div id="mob-sim-badge">SIM ACTIVE</div>
+          <button id="mob-btn-reset" onclick="resetSim()">RESET SIM</button>
+        </div>
+        <div id="mob-uuid-display"></div>
+      </div>
+
+      <div id="target-section">
+        <div class="target-input-row">
+          <label>目標 FLARE SKILL</label>
+          <input type="number" id="target-val" placeholder="---" min="0" max="94000" oninput="onTargetInput()">
+          <button id="btn-target-clear" onclick="clearTarget()">✕</button>
+        </div>
+        <div class="target-presets" id="target-presets"></div>
+      </div>
+
+      <div id="sim-color-toggle-row">
+        <label><input type="checkbox" id="chk-sim-colors" checked onchange="toggleSimColors(this.checked)">SIM色分け表示</label>
+        <label><input type="checkbox" id="chk-simout" onchange="toggleSimOut(this.checked)">除外曲を非表示</label>
+      </div>
+
+      <div class="mode-row">
+        <div class="mode-btn on" id="modeBtn-new" onclick="switchMode('new')">新規スコア</div>
+        <div class="mode-btn" id="modeBtn-update" onclick="switchMode('update')">既存更新</div>
+        <div class="mode-btn" id="modeBtn-candidate" onclick="switchMode('candidate')">候補曲</div>
+      </div>
+
+      <!-- New score form -->
+      <div id="form-new">
+        <div class="fg">
+          <label>CATEGORY</label>
+          <select id="n-cat">
+            <option value="CLASSIC">CLASSIC</option>
+            <option value="WHITE">WHITE</option>
+            <option value="GOLD">GOLD</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>SONG NAME</label>
+          <input type="text" id="n-name" value="新曲" onkeydown="if(event.key==='Enter'){event.preventDefault();addOrUpdateNewEntry();}">
+        </div>
+        <div class="frow">
+          <div class="fg"><label>DIFF</label>
+            <select id="n-diff">
+              <option value="CHALLENGE">CHALLENGE</option>
+              <option value="EXPERT">EXPERT</option>
+              <option value="DIFFICULT">DIFFICULT</option>
+              <option value="BASIC">BASIC</option>
+              <option value="BEGINNER">BEGINNER</option>
+            </select>
+          </div>
+          <div class="fg"><label>LV</label><select id="n-level"></select></div>
+          <div class="fg"><label>RANK</label><select id="n-rank"></select></div>
+        </div>
+        <button class="btn-add" id="btn-add-entry" onclick="addOrUpdateNewEntry()">+ 追加</button>
+      </div>
+
+      <!-- Candidate form -->
+      <div id="form-candidate" style="display:none">
+        <div class="fg"><label>CATEGORY</label>
+          <select id="c-cat">
+            <option value="CLASSIC">CLASSIC</option>
+            <option value="WHITE">WHITE</option>
+            <option value="GOLD">GOLD</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>SONG NAME</label>
+          <input type="text" id="c-name" value="候補曲" onkeydown="if(event.key==='Enter'){event.preventDefault();addCandidateEntry();}">
+        </div>
+        <div class="frow">
+          <div class="fg"><label>DIFF</label>
+            <select id="c-diff">
+              <option value="CHALLENGE">CHALLENGE</option>
+              <option value="EXPERT">EXPERT</option>
+              <option value="DIFFICULT">DIFFICULT</option>
+              <option value="BASIC">BASIC</option>
+              <option value="BEGINNER">BEGINNER</option>
+            </select>
+          </div>
+          <div class="fg"><label>LV</label><select id="c-level"></select></div>
+          <div class="fg"><label>RANK</label><select id="c-rank"></select></div>
+        </div>
+        <div class="fg"><label>TIER</label>
+          <select id="c-tier">
+            <option value="SOON">SOON - すぐ上げられそう</option>
+            <option value="MID">MID - 中期目標</option>
+            <option value="LONG">LONG - 長期目標</option>
+          </select>
+        </div>
+        <button class="btn-add" id="btn-add-cand" onclick="addCandidateEntry()">+ 候補に追加</button>
+        <div id="cand-note-section" style="display:none">
+          <div class="note-label">SONG NOTE</div>
+          <textarea id="cand-note-area" maxlength="140" placeholder="この曲へのメモ（140字以内）" oninput="onNoteInput(this)"></textarea>
+          <div class="comment-count" id="cand-note-count">0/140</div>
+        </div>
+      </div>
+
+      <!-- Update existing form -->
+      <div id="form-update" style="display:none">
+        <div class="fg"><label>CATEGORY</label>
+          <select id="u-cat" onchange="refreshUpdateSongs()">
+            <option value="CLASSIC">CLASSIC</option>
+            <option value="WHITE">WHITE</option>
+            <option value="GOLD">GOLD</option>
+          </select>
+        </div>
+        <div class="fg"><label>SONG</label><select id="u-song"></select></div>
+        <div class="fg"><label>NEW RANK</label><select id="u-rank"></select></div>
+        <div id="note-section" style="display:none">
+          <div class="note-label">SONG NOTE</div>
+          <textarea id="note-area" maxlength="140" placeholder="この曲へのメモ（140字以内）" oninput="onNoteInput(this)"></textarea>
+          <div class="comment-count" id="note-count">0/140</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-add" style="flex:1;margin-bottom:8px" onclick="addUpdateEntry()">✓ 適用</button>
+          <button class="btn-del" onclick="deleteSelectedEntry()">削除</button>
+        </div>
+      </div>
+
+      <div id="sim-comment-section">
+        <div class="comment-label">COMMENT</div>
+        <textarea id="sim-comment-area" maxlength="140" placeholder="シミュレーションへのメモ（140字以内）" oninput="onCommentInput(this)"></textarea>
+        <div class="comment-count" id="comment-count">0/140</div>
+      </div>
+
+      <div id="target-display"></div>
+
+      <div id="sim-result"></div>
+
+      <div id="sim-changes"></div>
+
+      <div id="new-entries-list" class="sim-pending-list"></div>
+      <div id="update-entries-list" class="sim-pending-list"></div>
+      <div id="delete-entries-list" class="sim-pending-list"></div>
+      <div id="candidate-list" class="sim-pending-list"></div>
+
+    </div>
+  </div>
+</div>
+
+<div id="mob-footer"></div>
+<div id="mob-overlay" onclick="closeMobRpane()"></div>
+<button id="mob-fab" onclick="toggleMobRpane()" aria-label="シミュレーターを開く">☰</button>
+
+<!-- Help Modal -->
+<div id="help-modal">
+  <div class="modal-box help-modal-box">
+    <h2>使い方</h2>
+    <div class="help-content">
+
+      <div class="help-section">
+        <h3>概要</h3>
+        <p>DDR のフレアスキルをシミュレーションする非公式ツールです。ブックマークレットで DDR World から自分のスコアデータを取得し、新規スコアの追加・既存スコアの更新・削除によってスキル合計値がどう変わるかをシミュレーションできます。シミュレーション結果は URL で保存・共有でき、画像としてダウンロードすることもできます。</p>
+        <p style="margin-top:6px;">保存データは<strong>最終アクセスから 90 日</strong>で自動削除されます。「JSONとしてDL」でのバックアップを推奨します。</p>
+        <p style="margin-top:6px;font-size:11px;">※ 本ツールは KONAMI および DDR World と無関係の非公式ツールです。</p>
+      </div>
+
+      <div class="help-section">
+        <h3>ブックマークレット登録</h3>
+        <ol style="padding-left:16px;margin:4px 0;">
+          <li class="help-section li" style="font-size:12px;color:#a0a0c0;line-height:1.75;">下のコードをコピーする</li>
+          <li class="help-section li" style="font-size:12px;color:#a0a0c0;line-height:1.75;">ブラウザのブックマークを新規作成し、URL欄にそのままペーストする</li>
+          <li class="help-section li" style="font-size:12px;color:#a0a0c0;line-height:1.75;">DDR World のフレアスキル対象楽曲ページでブックマークを実行する</li>
+        </ol>
+        <div class="bml-copy-box" id="bml-code"></div>
+        <button class="bml-copy-btn" onclick="copyBookmarklet(this)">コードをコピー</button>
+      </div>
+
+      <div class="help-section">
+        <h3>インポート方法</h3>
+        <ul>
+          <li><strong>ブックマークレット</strong> — KONAMI の DDR World 公式 Web サイトにログインし、フレアスキル対象楽曲ページでブックマークレットを実行。データ送信後に自動でシミュレータが開きます。</li>
+          <li><strong>JSON読込</strong> — 以前に「JSONとしてDL」で保存したファイルをインポートできます。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>シミュレーション</h3>
+        <ul>
+          <li><strong>新規スコア</strong> — 新規でフレアスキルを更新した場合の、スキル表への影響をシミュレーション。</li>
+          <li><strong>既存更新</strong> — 既存スコアのランクアップをシミュレーション。テーブルの行をクリックすると自動で選択されます。</li>
+          <li><strong>候補曲</strong> — SOON / MID / LONG のティアで練習候補を管理。シミュレーション結果には影響しません。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>SP / DP</h3>
+        <ul>
+          <li>ブックマークレットまたは JSON 読込時に SP / DP を判別してロックします。</li>
+          <li>新規シミュレーション時はヘッダーのトグルで切り替えられます。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>保存・共有</h3>
+        <ul>
+          <li><strong>シミュレーションを保存</strong> — 外部サービスのデータベースに保存し、URLが変わります。ブックマーク登録すると後からこのシミュレーションにアクセスしやすくなります。</li>
+          <li><strong>フォーク</strong> — 共有されたシミュレーションは自分なりに編集することができます。元のデータは変更されず、新規のレコードとして保存されます。URLを知っている人は誰でも閲覧・フォークできます。</li>
+          <li><strong>JSONとしてDL</strong> — ローカルにデータを JSON としてダウンロードします。JSON読込で復元できます。</li>
+          <li><strong>画像としてDL</strong> — スキル表・集計・コメントを含む画像を生成します。</li>
+          <li><strong>𝕏 で共有</strong> — 現在のスキル合計とランクを X に投稿します。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>目標スキル値</h3>
+        <ul>
+          <li>右ペイン上部に目標値を入力すると、現在値との差分と進捗バーが表示されます。</li>
+          <li>プリセット（ランク境界値）から選ぶこともできます。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>楽曲メモ・コメント</h3>
+        <ul>
+          <li><strong>楽曲メモ</strong> — テーブルの行をクリックすると右ペインにメモ欄が表示されます（140字以内）。</li>
+          <li><strong>全体コメント</strong> — シミュレーション全体へのコメント。画像化時に含まれます。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>データの有効期限</h3>
+        <ul>
+          <li>保存データは<strong>最終アクセスから 90 日</strong>で自動削除されます。</li>
+          <li>URL にアクセスするたびに有効期限が延長されます。</li>
+          <li>期限が近づくと警告が表示されます。「JSONとしてDL」でバックアップを保存しておくことを推奨します。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>データポリシー</h3>
+        <ul>
+          <li>ブックマークレットは KONAMI 公式の DDR World ページ上の<strong>楽曲スコアデータのみ</strong>を取得します。</li>
+          <li>取得する情報: 楽曲名・難易度・レベル・フレアランク・フレアスキル値・達成日</li>
+          <li>プレイヤー名・アカウント情報・その他の個人情報は<strong>一切取得しません</strong>。</li>
+          <li>取得データは外部サービスのデータベースに保存され、有効期限経過後に自動削除されます。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>📱 モバイル版の操作</h3>
+        <ul>
+          <li><strong>右下の ☰ ボタン</strong> — シミュレーターパネル（右ペイン）の開閉。スコア入力・目標値設定はここから。</li>
+          <li><strong>枠ヘッダ（CLASSIC / WHITE / GOLD）をタップ</strong> — その枠の表をトグル（折りたたみ／展開）。3枠すべて閉じるとページ先頭に戻ります。</li>
+          <li><strong>CANDIDATES をタップ</strong> — 候補曲リストの折りたたみ／展開。候補曲を追加すると自動で展開されます。</li>
+          <li><strong>SP / DP 切替</strong> — シミュレーターパネル上部（右ペイン内）から変更できます。</li>
+          <li><strong>UUID</strong> — シミュレーターパネル上部に短縮表示されます。</li>
+        </ul>
+      </div>
+
+      <div class="help-credit">
+        <div>Developed by <strong>H4rug</strong> &nbsp;·&nbsp; <a href="https://x.com/harug_game" target="_blank">𝕏 @harug_game</a></div>
+        <div>Built with <strong>Claude Code</strong> &nbsp;·&nbsp; Powered by <strong>Supabase</strong></div>
+      </div>
+
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal btn-close" onclick="closeHelp()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- TTL Warning Modal -->
+<div id="ttl-modal">
+  <div class="modal-box">
+    <h2>データ有効期限のお知らせ</h2>
+    <p id="ttl-modal-msg"></p>
+    <p>JSONダウンロードでバックアップを保存できます。</p>
+    <div class="modal-actions">
+      <button class="btn-modal btn-copy" onclick="downloadJSON();closeTTLModal()">JSONダウンロード</button>
+      <button class="btn-modal btn-close" onclick="closeTTLModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- UUID Modal -->
+<div id="uuid-modal">
+  <div class="modal-box">
+    <h2>保存完了</h2>
+    <p>このURLをブックマーク登録してください。<br>次回アクセス時に自動でデータが読み込まれます。</p>
+    <div class="modal-url" id="modal-url-text"></div>
+    <div class="modal-actions">
+      <button class="btn-modal btn-copy" onclick="copyModalURL()">URLをコピー</button>
+      <button class="btn-modal btn-modal-green" onclick="saveAsImage()">画像としてDL</button>
+      <button class="btn-modal btn-x" onclick="shareOnX()">𝕏 で共有</button>
+      <button class="btn-modal btn-close" onclick="closeModal()">閉じる</button>
+    </div>
+    <div id="copy-feedback"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Constants
+// ============================================================
+const FLARE_TABLE = {
+  1:  [145,153,162,171,179,188,197,205,214,223,232],
+  2:  [155,164,173,182,192,201,210,220,229,238,248],
+  3:  [170,180,190,200,210,221,231,241,251,261,272],
+  4:  [185,196,207,218,229,240,251,262,273,284,296],
+  5:  [205,217,229,241,254,266,278,291,303,315,328],
+  6:  [230,243,257,271,285,299,312,326,340,354,368],
+  7:  [255,270,285,300,316,331,346,362,377,392,408],
+  8:  [290,307,324,342,359,377,394,411,429,446,464],
+  9:  [335,355,375,395,415,435,455,475,495,515,536],
+  10: [400,424,448,472,496,520,544,568,592,616,640],
+  11: [465,492,520,548,576,604,632,660,688,716,744],
+  12: [510,540,571,601,632,663,693,724,754,785,816],
+  13: [545,577,610,643,675,708,741,773,806,839,872],
+  14: [575,609,644,678,713,747,782,816,851,885,920],
+  15: [600,636,672,708,744,780,816,852,888,924,960],
+  16: [620,657,694,731,768,806,843,880,917,954,992],
+  17: [635,673,711,749,787,825,863,901,939,977,1016],
+  18: [650,689,728,767,806,845,884,923,962,1001,1040],
+  19: [665,704,744,784,824,864,904,944,984,1024,1064],
+};
+const RANK_NAMES = ['(なし)','I','II','III','IV','V','VI','VII','VIII','IX','EX'];
+const CATS = ['CLASSIC','WHITE','GOLD'];
+const RANK_THRESHOLDS = [
+  {name:'NONE',sub:'',min:0},{name:'NONE',sub:'+',min:500},{name:'NONE',sub:'++',min:1000},{name:'NONE',sub:'+++',min:1500},
+  {name:'水星/MERCURY',sub:'',min:2000},{name:'水星/MERCURY',sub:'+',min:3000},{name:'水星/MERCURY',sub:'++',min:4000},{name:'水星/MERCURY',sub:'+++',min:5000},
+  {name:'金星/VENUS',sub:'',min:6000},{name:'金星/VENUS',sub:'+',min:7000},{name:'金星/VENUS',sub:'++',min:8000},{name:'金星/VENUS',sub:'+++',min:9000},
+  {name:'地球/EARTH',sub:'',min:10000},{name:'地球/EARTH',sub:'+',min:11500},{name:'地球/EARTH',sub:'++',min:13000},{name:'地球/EARTH',sub:'+++',min:14500},
+  {name:'火星/MARS',sub:'',min:16000},{name:'火星/MARS',sub:'+',min:18000},{name:'火星/MARS',sub:'++',min:20000},{name:'火星/MARS',sub:'+++',min:22000},
+  {name:'木星/JUPITER',sub:'',min:24000},{name:'木星/JUPITER',sub:'+',min:26500},{name:'木星/JUPITER',sub:'++',min:29000},{name:'木星/JUPITER',sub:'+++',min:31500},
+  {name:'土星/SATURN',sub:'',min:34000},{name:'土星/SATURN',sub:'+',min:36750},{name:'土星/SATURN',sub:'++',min:39500},{name:'土星/SATURN',sub:'+++',min:42250},
+  {name:'天王星/URANUS',sub:'',min:45000},{name:'天王星/URANUS',sub:'+',min:48750},{name:'天王星/URANUS',sub:'++',min:52500},{name:'天王星/URANUS',sub:'+++',min:56250},
+  {name:'海王星/NEPTUNE',sub:'',min:60000},{name:'海王星/NEPTUNE',sub:'+',min:63750},{name:'海王星/NEPTUNE',sub:'++',min:67500},{name:'海王星/NEPTUNE',sub:'+++',min:71250},
+  {name:'太陽/SUN',sub:'',min:75000},{name:'太陽/SUN',sub:'+',min:78750},{name:'太陽/SUN',sub:'++',min:82500},{name:'太陽/SUN',sub:'+++',min:86250},
+  {name:'世界/WORLD',sub:'',min:90000},
+];
+
+// ============================================================
+// Sample data
+// ============================================================
+
+// ============================================================
+// State
+// ============================================================
+let skillData        = {CLASSIC:[],WHITE:[],GOLD:[]};
+let simNewEntries    = [];   // [{id,cat,name,diff,level,rankIdx,fs,date}]
+let simUpdateEntries = [];   // [{id,cat,entryId,newRankIdx}]
+let simDeleteEntries = [];   // [{id,cat,entryId}]
+let simDirty         = false; // 保存後に変更があればtrue
+let sessionStyle     = null;  // 'SP'|'DP'|null(未設定)
+let sessionStyleLocked = false; // インポート時はtrue
+let editingNewId     = null;
+let simMode          = 'new';
+let simCounter       = 0;
+let showSimColors    = true;
+let showSimOut       = true;
+let simComment       = '';
+let noteEdits        = {};   // {entryId: noteText}
+let currentNoteId    = null;
+let candidateEntries = [];   // [{id,cat,name,diff,level,rankIdx,fs,tier}]
+let editingCandId    = null;
+let targetSkill      = null;
+
+// ============================================================
+// Core helpers
+// ============================================================
+function top30(entries) {
+  return [...entries].sort((a,b) => b.fs-a.fs || b.date.localeCompare(a.date)).slice(0,30);
+}
+function catTotal(entries) { return top30(entries).reduce((s,e)=>s+e.fs,0); }
+function grandTotal(data)  { return CATS.reduce((s,c)=>s+catTotal(data[c]),0); }
+function getRank(total) {
+  let r=RANK_THRESHOLDS[0];
+  for(const t of RANK_THRESHOLDS){if(total>=t.min)r=t;else break;}
+  return r;
+}
+function getNextRank(total){ return RANK_THRESHOLDS.find(t=>t.min>total)||null; }
+function hasSimActive(){ return simNewEntries.length>0||simUpdateEntries.length>0||simDeleteEntries.length>0; }
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function fmtRank(r){ return r.name+(r.sub?' '+r.sub:''); }
+function dStr(d){ return (d>=0?'+':'')+d.toLocaleString(); }
+function dCls(d){ return d>0?'pos':d<0?'neg':'zer'; }
+
+function normalizeFsFields(dataObj){
+  CATS.forEach(cat=>{
+    (dataObj[cat]||[]).forEach(e=>{
+      if(e.fs==null) e.fs=(FLARE_TABLE[e.level]||[])[e.rankIdx]||0;
+    });
+  });
+}
+function ensureIds(dataObj){
+  CATS.forEach(cat=>{
+    (dataObj[cat]||[]).forEach(e=>{
+      if(!e.id) e.id=`${e.name}::${e.diff}`;
+    });
+  });
+}
+
+function buildSimData(withFlags=false) {
+  const d = JSON.parse(JSON.stringify(skillData));
+  const delIds = new Set(simDeleteEntries.map(e=>e.entryId));
+  CATS.forEach(cat=>{ d[cat]=d[cat].filter(e=>!delIds.has(e.id)); });
+  // 逆順でpushすることで、最後に追加したエントリが同FS内の最上位になる（stable sort維持）
+  [...simNewEntries].reverse().forEach(e => {
+    const entry={...e};
+    if(withFlags) entry._sim='new';
+    d[e.cat].push(entry);
+  });
+  const today=new Date().toISOString().slice(0,10);
+  simUpdateEntries.forEach(u => {
+    const idx = d[u.cat].findIndex(e=>e.id===u.entryId);
+    if(idx>=0){
+      d[u.cat][idx].rankIdx = u.newRankIdx;
+      d[u.cat][idx].fs = (FLARE_TABLE[d[u.cat][idx].level]||[])[u.newRankIdx]||0;
+      d[u.cat][idx].date = today;
+      if(withFlags) d[u.cat][idx]._sim='mod';
+    }
+  });
+  // noteEditsを全エントリに適用
+  CATS.forEach(cat=>{ d[cat].forEach(e=>{ if(noteEdits[e.id]!==undefined) e.note=noteEdits[e.id]; }); });
+  return d;
+}
+
+// ============================================================
+// HTML Parser
+// ============================================================
+function imgToRankIdx(src){
+  if(!src)return 0;
+  if(src.includes('flare_ex'))return 10;
+  const m=src.match(/flare_(\d+)/);return m?parseInt(m[1]):0;
+}
+const DIFF_PREFIX={BEGINNER:'b',BASIC:'B',DIFFICULT:'D',EXPERT:'E',CHALLENGE:'C'};
+function getDiffDisplay(diff,style){
+  if(!style) return diff; // 旧データ: diff='BSP'形式をそのまま返す
+  const p=DIFF_PREFIX[diff];
+  return p?p+style:null;
+}
+// ============================================================
+// Render helpers
+// ============================================================
+function rb(rankIdx){
+  const n=RANK_NAMES[rankIdx];
+  const cls=rankIdx===10?'EX':rankIdx===0?'none':n;
+  return `<span class="rb rb-${cls}">${n}</span>`;
+}
+function diffSpan(diff,style){const d=getDiffDisplay(diff,style);return d?`<span class="diff-${d}">${d}</span>`:'';}
+
+
+function renderTable(cat){
+  const tbody=document.querySelector(`#tbl-${cat.toLowerCase()} tbody`);
+  const simD  =buildSimData();
+  const baseT30=top30(skillData[cat]);
+  const newT30 =top30(simD[cat]);
+  const baseTotal=baseT30.reduce((s,e)=>s+e.fs,0);
+  const newTotal =newT30.reduce((s,e)=>s+e.fs,0);
+  const delta=newTotal-baseTotal;
+  const baseIds=new Set(baseT30.map(e=>e.id));
+  const newIds =new Set(newT30.map(e=>e.id));
+  const simNewIds=new Set(simNewEntries.map(e=>e.id));
+  const updIds=new Set(simUpdateEntries.filter(u=>u.cat===cat).map(u=>u.entryId));
+
+  document.getElementById(`fs-${cat.toLowerCase()}`).textContent=newTotal.toLocaleString();
+  const dEl=document.getElementById(`d-${cat.toLowerCase()}`);
+  if(hasSimActive()&&delta!==0){
+    dEl.textContent=dStr(delta);
+    dEl.style.color=delta>0?'#48d898':'#d84848';
+  } else { dEl.textContent=''; }
+
+  const removedRows=baseT30.filter(e=>!newIds.has(e.id));
+  let html='';
+  newT30.forEach((e,i)=>{
+    let cls='row-clickable';
+    let onclick='';
+    if(simNewIds.has(e.id)){
+      if(showSimColors) cls='sim-in row-clickable';
+      onclick=`onclick="editNewEntry('${esc(e.id)}')"`;
+    } else {
+      if(showSimColors&&updIds.has(e.id)) cls='sim-mod row-clickable';
+      else if(showSimColors&&e._sim==='new') cls='sim-in row-clickable';
+      else if(showSimColors&&e._sim==='mod') cls='sim-mod row-clickable';
+      onclick=`onclick="selectRowForUpdate('${cat}','${esc(e.id)}')"`;
+    }
+    const hasNote=!!(noteEdits[e.id]!==undefined?noteEdits[e.id]:e.note);
+    html+=`<tr class="${cls}" ${onclick}>
+      <td class="pos${hasNote?' has-note':''}">${i+1}</td>
+      <td class="sname" title="${esc(e.name)}">${esc(e.name)}</td>
+      <td>${diffSpan(e.diff,e.style)}</td>
+      <td class="lv">${e.level}</td>
+      <td>${rb(e.rankIdx)}</td>
+      <td class="fsv">${e.fs}</td>
+    </tr>`;
+  });
+  if(showSimOut) removedRows.forEach(e=>{
+    html+=`<tr class="sim-out">
+      <td class="pos">-</td>
+      <td class="sname" title="${esc(e.name)}">${esc(e.name)}</td>
+      <td>${diffSpan(e.diff,e.style)}</td>
+      <td class="lv">${e.level}</td>
+      <td>${rb(e.rankIdx)}</td>
+      <td class="fsv">${e.fs}</td>
+    </tr>`;
+  });
+  tbody.innerHTML=html;
+}
+
+function renderHeader(){
+  const d=buildSimData();
+  const total=grandTotal(d);
+  const rank=getRank(total);
+  const next=getNextRank(total);
+  const hdTotal=document.getElementById('hd-total-val');
+  const hdRank=document.getElementById('hd-rank-val');
+  hdTotal.textContent=total.toLocaleString();
+  hdRank.textContent=fmtRank(rank);
+  const hrs=getTargetRankStyle(total);
+  hdTotal.style.cssText=hrs.headerValStyle||hrs.valStyle;
+  hdRank.style.cssText=hrs.rankStyle;
+  const nv=document.getElementById('hd-next-val'), nl=document.getElementById('hd-next-lbl');
+  if(targetSkill){
+    const diff=targetSkill-total;
+    if(diff<=0){ nv.textContent='✓'; nl.textContent='目標達成！'; }
+    else { nv.textContent=diff.toLocaleString(); nl.textContent='→ 目標'; }
+  } else if(next){ nv.textContent=(next.min-total).toLocaleString(); nl.textContent=`→ ${fmtRank(next)}`; }
+  else { nv.textContent='★'; nl.textContent='MAX RANK'; }
+  document.getElementById('sim-badge').classList.toggle('on',hasSimActive());
+  // Mobile stats sync
+  const mTotal=document.getElementById('mob-hd-total-val');
+  const mRank =document.getElementById('mob-hd-rank-val');
+  const mNext =document.getElementById('mob-hd-next-val');
+  const mNextL=document.getElementById('mob-hd-next-lbl');
+  if(mTotal) mTotal.textContent=total.toLocaleString();
+  if(mRank)  mRank.textContent=fmtRank(rank);
+  if(mNext&&mNextL){
+    if(targetSkill){ const d=targetSkill-total; if(d<=0){mNext.textContent='✓';mNextL.textContent='目標達成！';}else{mNext.textContent=d.toLocaleString();mNextL.textContent='→ 目標';} }
+    else if(next){ mNext.textContent=(next.min-total).toLocaleString(); mNextL.textContent=`→ ${fmtRank(next)}`; }
+    else { mNext.textContent='★'; mNextL.textContent='MAX RANK'; }
+  }
+  const mBadge=document.getElementById('mob-sim-badge');
+  const mReset=document.getElementById('mob-btn-reset');
+  if(mBadge) mBadge.classList.toggle('on',hasSimActive());
+  if(mReset) mReset.classList.toggle('on',hasSimActive());
+}
+
+function renderPendingList(entries, elId, editFn, removeFn) {
+  const el=document.getElementById(elId);
+  if(entries.length===0){el.innerHTML='';return;}
+  el.innerHTML=entries.map(e=>`
+    <div class="sim-pending-item${e.id===editingNewId?' active':''}" id="spi-${esc(e.id)}">
+      <span class="spi-name" title="${esc(e.name||e.id)}">${esc(e.name||e.label||e.id)}</span>
+      <span class="spi-info">${esc(e.infoStr||'')}</span>
+      <button class="spi-btn" onclick="${editFn}('${esc(e.id)}')" title="編集">✏</button>
+      <button class="spi-btn del" onclick="${removeFn}('${esc(e.id)}')" title="削除">✕</button>
+    </div>`).join('');
+}
+
+function renderSimResult(){
+  const el=document.getElementById('sim-result');
+  const grandBase=grandTotal(skillData);
+  const grandNew =grandTotal(buildSimData());
+  const gDelta   =grandNew-grandBase;
+  const rankBase =getRank(grandBase);
+  const rankNew  =getRank(grandNew);
+  const rankUp   =rankBase.name!==rankNew.name||rankBase.sub!==rankNew.sub;
+
+  // Progress bar
+  let progHtml='';
+  if(targetSkill){
+    const diff=targetSkill-grandNew;
+    if(diff<=0){
+      progHtml=`<div class="prog-wrap">
+        <div class="prog-lbl">✓ 目標 ${targetSkill.toLocaleString()} 達成！</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:100%"></div></div>
+        <div class="prog-pct">100.0%</div>
+      </div>`;
+    } else {
+      const prevT=[...RANK_THRESHOLDS].filter(t=>t.min<=grandNew).pop();
+      const fromVal=prevT?prevT.min:0;
+      const range=targetSkill-fromVal;
+      const pct=range>0?Math.min(100,Math.max(0,(grandNew-fromVal)/range*100)):0;
+      progHtml=`<div class="prog-wrap">
+        <div class="prog-lbl">→ 目標 ${targetSkill.toLocaleString()} まで ${diff.toLocaleString()}</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${pct.toFixed(1)}%"></div></div>
+        <div class="prog-pct">${pct.toFixed(1)}%</div>
+      </div>`;
+    }
+  } else {
+    const next=getNextRank(grandNew);
+    if(next){
+      const prev=[...RANK_THRESHOLDS].filter(t=>t.min<=grandNew).pop();
+      const range=next.min-(prev?prev.min:0);
+      const pct=prev?Math.min(100,(grandNew-prev.min)/range*100):0;
+      progHtml=`<div class="prog-wrap">
+        <div class="prog-lbl">→ ${fmtRank(next)} まで ${(next.min-grandNew).toLocaleString()}</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${pct.toFixed(1)}%"></div></div>
+        <div class="prog-pct">${pct.toFixed(1)}%</div>
+      </div>`;
+    }
+  }
+
+  // Per-cat summary
+  let catsHtml='';
+  let allAdded=[],allRemoved=[],allMod=[];
+  for(const cat of CATS){
+    const baseT=catTotal(skillData[cat]);
+    const newT =catTotal(buildSimData()[cat]);
+    const d=newT-baseT;
+    catsHtml+=`<div class="sr-catline"><span>${cat}</span>
+      <span>${baseT.toLocaleString()} → ${newT.toLocaleString()} <span class="cd ${dCls(d)}">(${dStr(d)})</span></span>
+    </div>`;
+    const b30=top30(skillData[cat]),n30=top30(buildSimData()[cat]);
+    const bIds=new Set(b30.map(e=>e.id)),nIds=new Set(n30.map(e=>e.id));
+    const snIds=new Set(simNewEntries.filter(e=>e.cat===cat).map(e=>e.id));
+    n30.filter(e=>!bIds.has(e.id)&&snIds.has(e.id)).forEach(e=>allAdded.push({...e,cat}));
+    b30.filter(e=>!nIds.has(e.id)).forEach(e=>allRemoved.push({...e,cat}));
+    simUpdateEntries.filter(u=>u.cat===cat).forEach(u=>{
+      const oe=skillData[cat].find(e=>e.id===u.entryId);
+      const ne=buildSimData()[cat].find(e=>e.id===u.entryId);
+      if(oe&&ne&&oe.rankIdx!==ne.rankIdx)allMod.push({oe,ne});
+    });
+  }
+
+  let changesHtml='';
+  if(allAdded.length||allRemoved.length||allMod.length){
+    changesHtml=`<div class="sr-changes sr-section-changes"><div class="sr-ch-title">CHANGES</div>`;
+    allMod.forEach(({oe,ne})=>{
+      changesHtml+=`<div class="sr-change mod"><span class="ch-name">${esc(oe.name)}</span><span class="ch-val">${RANK_NAMES[oe.rankIdx]}→${RANK_NAMES[ne.rankIdx]} (${dStr(ne.fs-oe.fs)})</span></div>`;
+    });
+    allAdded.forEach(e=>{
+      changesHtml+=`<div class="sr-change add"><span class="ch-name">${esc(e.name)}</span><span class="ch-val">+${e.fs}</span></div>`;
+    });
+    allRemoved.forEach(e=>{
+      changesHtml+=`<div class="sr-change rem"><span class="ch-name">${esc(e.name)}</span><span class="ch-val">-${e.fs}</span></div>`;
+    });
+    changesHtml+=`</div>`;
+  } else if(gDelta===0){
+    changesHtml=`<div class="sr-changes sr-section-changes"><div class="sr-nochange">スキル表への影響なし</div></div>`;
+  }
+
+  el.innerHTML=`
+    <div class="sr-block">
+      <div class="sr-delta">
+        <div style="font-size:12px;color:#484860;margin-bottom:4px;">${grandBase.toLocaleString()} → ${grandNew.toLocaleString()}</div>
+        <div class="dv ${dCls(gDelta)}">${dStr(gDelta)}</div>
+        <div class="dl">TOTAL FLARE SKILL</div>
+      </div>
+      ${rankUp?`<div class="sr-rank">🎉 ${fmtRank(rankBase)} → ${fmtRank(rankNew)}</div>`:''}
+      <div class="sr-cats">${catsHtml}</div>
+    </div>
+    ${progHtml}
+    ${buildStatsHtml()}`;
+
+  // CHANGESは別divに分離
+  const cel=document.getElementById('sim-changes');
+  if(cel) cel.innerHTML=changesHtml;
+}
+
+function buildStatsHtml(){
+  const simD=hasSimActive()?buildSimData():null;
+  function dist(data,cat){
+    const d={};
+    top30(data[cat]).forEach(e=>{const k=`Lv${e.level} ${RANK_NAMES[e.rankIdx]}`;d[k]=(d[k]||0)+1;});
+    return d;
+  }
+  let html='<div class="sr-changes" style="margin-bottom:8px"><div class="sr-ch-title">STATS</div>';
+  for(const cat of CATS){
+    const bd=dist(skillData,cat);
+    const sd=simD?dist(simD,cat):null;
+    const keys=[...new Set([...Object.keys(bd),...(sd?Object.keys(sd):[])])]
+      .sort((a,b)=>{
+        const[,al,ar]=a.match(/Lv(\d+) (.+)/);
+        const[,bl,br]=b.match(/Lv(\d+) (.+)/);
+        if(al!==bl)return parseInt(bl)-parseInt(al);
+        return RANK_NAMES.indexOf(br)-RANK_NAMES.indexOf(ar);
+      });
+    html+=`<div class="stats-cat-title ${cat.toLowerCase()}" style="margin-top:8px">${cat}</div>
+      <table class="stats-tbl"><thead><tr><th>項目</th><th>現在</th>${sd?'<th>SIM</th><th>Δ</th>':''}</tr></thead><tbody>`;
+    for(const k of keys){
+      const bv=bd[k]||0;
+      const sv=sd?(sd[k]||0):null;
+      if(bv===0&&(sv===null||sv===0))continue;
+      const d=sv!==null?sv-bv:0;
+      html+=`<tr>
+        <td>${k}</td>
+        <td class="sv-cur">${bv}</td>
+        ${sd?`<td class="sv-sim">${sv}</td><td class="sv-dlt ${dCls(d)}">${d!==0?dStr(d):'-'}</td>`:''}
+      </tr>`;
+    }
+    html+=`</tbody></table>`;
+  }
+  html+=`</div>`;
+  return html;
+}
+
+function detectStyleFromData(dataObj){
+  for(const cat of CATS){
+    for(const e of (dataObj[cat]||[])){
+      if(e.style) return e.style;
+    }
+  }
+  return null;
+}
+function setSessionStyle(style, locked=false){
+  if(sessionStyleLocked) return; // ロック中は変更不可
+  if(style && hasSimActive() && sessionStyle && sessionStyle!==style){
+    if(!confirm(`スタイルを${sessionStyle}から${style}に変更するとシミュレーションの難易度が異なる場合があります。変更しますか？`))return;
+  }
+  sessionStyle=style;
+  sessionStyleLocked=locked;
+  renderStyleUI();
+}
+function renderStyleUI(){
+  const badge=document.getElementById('hd-style-badge');
+  const toggle=document.getElementById('hd-style-toggle');
+  const mBadge=document.getElementById('mob-style-badge');
+  const mToggle=document.getElementById('mob-style-toggle');
+  if(sessionStyleLocked && sessionStyle){
+    badge.textContent=sessionStyle;
+    badge.style.display='';
+    toggle.style.display='none';
+    if(mBadge){ mBadge.textContent=sessionStyle; mBadge.style.display='block'; }
+    if(mToggle) mToggle.style.display='none';
+  } else if(!sessionStyleLocked){
+    badge.style.display='none';
+    toggle.style.display='';
+    document.getElementById('btn-style-sp').classList.toggle('active',sessionStyle==='SP'||!sessionStyle);
+    document.getElementById('btn-style-dp').classList.toggle('active',sessionStyle==='DP');
+    if(mBadge) mBadge.style.display='none';
+    if(mToggle){
+      mToggle.style.display='flex';
+      document.getElementById('mob-btn-style-sp').classList.toggle('active',sessionStyle==='SP'||!sessionStyle);
+      document.getElementById('mob-btn-style-dp').classList.toggle('active',sessionStyle==='DP');
+    }
+    if(!sessionStyle) setSessionStyle('SP'); // デフォルトSP
+  }
+}
+
+function updateEmptyBanner(){
+  const isEmpty=CATS.every(c=>skillData[c].length===0);
+  const hasNewSim=simNewEntries.length>0;
+  document.getElementById('empty-banner').classList.toggle('on',isEmpty&&!hasNewSim);
+  document.getElementById('import-hint').classList.toggle('on',isEmpty&&hasNewSim);
+}
+
+function render(){
+  CATS.forEach(renderTable);
+  renderHeader();
+  renderTarget();
+  updateSaveBtnLabel();
+  updateEmptyBanner();
+  updateActionButtons();
+  if(simMode==='update') refreshUpdateSongs();
+  renderPendingList(
+    simNewEntries.map(e=>({...e,infoStr:`${e.cat} ${getDiffDisplay(e.diff,e.style)} Lv${e.level} ${RANK_NAMES[e.rankIdx]} ${e.fs}`})),
+    'new-entries-list','editNewEntry','removeNewEntry'
+  );
+  renderPendingList(
+    simUpdateEntries.map(u=>{
+      const old=skillData[u.cat].find(e=>e.id===u.entryId);
+      return{...u,name:old?old.name:u.entryId,infoStr:old?`${RANK_NAMES[old.rankIdx]}→${RANK_NAMES[u.newRankIdx]}`:''};
+    }),
+    'update-entries-list','editUpdateEntry','removeUpdateEntry'
+  );
+  renderDeleteList();
+  renderSimResult();
+  renderCandidates();
+  renderPendingList(
+    candidateEntries.map(e=>({...e,infoStr:`${e.tier} ${e.cat} Lv${e.level} ${RANK_NAMES[e.rankIdx]}`})),
+    'candidate-list','editCandidateEntry','removeCandidateEntry'
+  );
+}
+
+// ============================================================
+// Sim: new entries
+// ============================================================
+function getNewFormVals(){
+  return{
+    cat:document.getElementById('n-cat').value,
+    name:document.getElementById('n-name').value||'新曲',
+    diff:document.getElementById('n-diff').value,
+    style:sessionStyle||'SP',
+    level:parseInt(document.getElementById('n-level').value),
+    rankIdx:parseInt(document.getElementById('n-rank').value),
+  };
+}
+function addOrUpdateNewEntry(){
+  const v=getNewFormVals();
+  const fs=(FLARE_TABLE[v.level]||[])[v.rankIdx]||0;
+  if(editingNewId!==null){
+    const idx=simNewEntries.findIndex(e=>e.id===editingNewId);
+    if(idx>=0)simNewEntries[idx]={...simNewEntries[idx],...v,fs};
+    editingNewId=null;
+    document.getElementById('btn-add-entry').textContent='+ 追加';
+    document.getElementById('btn-add-entry').classList.remove('editing');
+  } else {
+    simNewEntries.push({id:`sim_new_${simCounter++}`,date:'9999-12-31',...v,fs});
+  simDirty=true;
+  }
+  render();
+}
+function editNewEntry(id){
+  const e=simNewEntries.find(e=>e.id===id);if(!e)return;
+  switchMode('update', true);
+  document.getElementById('u-cat').value=e.cat;
+  refreshUpdateSongs();
+  document.getElementById('u-song').value=e.id;
+  document.getElementById('u-rank').value=String(e.rankIdx);
+  showNoteSection(id);
+  document.getElementById('rpane-body').scrollTop=0;
+}
+function removeNewEntry(id){
+  simNewEntries=simNewEntries.filter(e=>e.id!==id);
+  simDirty=true;
+  if(editingNewId===id){
+    editingNewId=null;
+    document.getElementById('btn-add-entry').textContent='+ 追加';
+    document.getElementById('btn-add-entry').classList.remove('editing');
+  }
+  render();
+}
+
+// ============================================================
+// Sim: update existing (multiple)
+// ============================================================
+function addUpdateEntry(){
+  const cat=document.getElementById('u-cat').value;
+  const entryId=document.getElementById('u-song').value;
+  const newRankIdx=parseInt(document.getElementById('u-rank').value);
+  // simNewEntry の場合は直接更新
+  const newEntry=simNewEntries.find(e=>e.id===entryId);
+  if(newEntry){
+    const fs=(FLARE_TABLE[newEntry.level]||[])[newRankIdx]||0;
+    simNewEntries=simNewEntries.map(e=>e.id===entryId?{...e,rankIdx:newRankIdx,fs}:e);
+    simDirty=true;
+    render();
+    return;
+  }
+  const old=skillData[cat].find(e=>e.id===entryId);
+  if(!old)return;
+  if(newRankIdx===old.rankIdx){
+    // FS変動なし → simUpdateEntriesから除去してソート維持
+    simUpdateEntries=simUpdateEntries.filter(u=>!(u.entryId===entryId&&u.cat===cat));
+    simDirty=true;
+    render();
+    return;
+  }
+  const existing=simUpdateEntries.findIndex(u=>u.entryId===entryId&&u.cat===cat);
+  if(existing>=0)simUpdateEntries[existing]={...simUpdateEntries[existing],newRankIdx};
+  else simUpdateEntries.push({id:`sim_upd_${simCounter++}`,cat,entryId,newRankIdx});
+  simDirty=true;
+  render();
+}
+function editUpdateEntry(id){
+  const u=simUpdateEntries.find(u=>u.id===id);if(!u)return;
+  document.getElementById('u-cat').value=u.cat;
+  refreshUpdateSongs();
+  document.getElementById('u-song').value=u.entryId;
+  document.getElementById('u-rank').value=String(u.newRankIdx);
+  document.getElementById('rpane-body').scrollTop=0;
+}
+function removeUpdateEntry(id){
+  simUpdateEntries=simUpdateEntries.filter(u=>u.id!==id);
+  simDirty=true;
+  render();
+}
+
+// ============================================================
+// Sim: delete entries
+// ============================================================
+function deleteSelectedEntry(){
+  const cat=document.getElementById('u-cat').value;
+  const entryId=document.getElementById('u-song').value;
+  if(!entryId)return;
+  if(simDeleteEntries.some(d=>d.entryId===entryId&&d.cat===cat))return;
+  simUpdateEntries=simUpdateEntries.filter(u=>!(u.entryId===entryId&&u.cat===cat));
+  simDeleteEntries.push({id:`sim_del_${simCounter++}`,cat,entryId});
+  simDirty=true;
+  render();
+}
+function removeDeleteEntry(id){
+  simDeleteEntries=simDeleteEntries.filter(d=>d.id!==id);
+  render();
+}
+function renderDeleteList(){
+  const el=document.getElementById('delete-entries-list');
+  if(!el)return;
+  if(simDeleteEntries.length===0){el.innerHTML='';return;}
+  el.innerHTML=simDeleteEntries.map(d=>{
+    const e=skillData[d.cat].find(e=>e.id===d.entryId);
+    const name=e?esc(e.name):esc(d.entryId);
+    return`<div class="sim-pending-item">
+      <span class="spi-name" title="${name}">${name}</span>
+      <span class="spi-info" style="color:#804040">削除</span>
+      <button class="spi-btn del" onclick="removeDeleteEntry('${esc(d.id)}')" title="取消">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// Target skill
+// ============================================================
+const TARGET_PRESET_ROWS=[
+  [{label:'NEP',val:60000},{label:'NEP+',val:63750},{label:'NEP++',val:67500},{label:'NEP+++',val:71250}],
+  [{label:'SUN',val:75000},{label:'SUN+',val:78750},{label:'SUN++',val:82500},{label:'SUN+++',val:86250}],
+  [{label:'WORLD',val:90000},{label:'91000',val:91000},{label:'92000',val:92000},{label:'93000',val:93000}],
+];
+function initTargetPresets(){
+  const el=document.getElementById('target-presets');
+  if(!el)return;
+  el.innerHTML=TARGET_PRESET_ROWS.map(row=>
+    `<div class="target-presets-row">${row.map(p=>
+      `<button class="target-preset" id="tp-${p.val}" onclick="setTarget(${p.val})">${p.label}</button>`
+    ).join('')}</div>`
+  ).join('');
+}
+function setTarget(val){
+  targetSkill=val;
+  document.getElementById('target-val').value=val;
+  render();
+}
+function onTargetInput(){
+  const el=document.getElementById('target-val');
+  let v=parseInt(el.value);
+  if(!isNaN(v)&&v>94000){v=94000;el.value=94000;}
+  targetSkill=isNaN(v)?null:v;
+  render();
+}
+function clearTarget(){
+  targetSkill=null;
+  document.getElementById('target-val').value='';
+  render();
+}
+const RANK_COLORS = {
+  'NONE':        s => `hsl(240,15%,${38+s*8}%)`,
+  '水星/MERCURY': s => `hsl(210,${30+s*15}%,${48+s*10}%)`,
+  '金星/VENUS':   s => `hsl(45,${55+s*18}%,${44+s*10}%)`,
+  '地球/EARTH':   s => `hsl(140,${45+s*18}%,${36+s*10}%)`,
+  '火星/MARS':    s => `hsl(0,${58+s*18}%,${40+s*10}%)`,
+  '木星/JUPITER': s => `hsl(280,${48+s*18}%,${38+s*10}%)`,
+  '土星/SATURN':  s => `hsl(220,${38+s*18}%,${40+s*10}%)`,
+  '天王星/URANUS': s => `hsl(180,${58+s*18}%,${38+s*10}%)`,
+  '海王星/NEPTUNE':s => `hsl(230,${58+s*18}%,${38+s*10}%)`,
+  '太陽/SUN':     s => `hsl(${28-s*6},${68+s*18}%,${46+s*10}%)`,
+};
+const SUB_IDX = {'':0,'+':1,'++':2,'+++':3};
+function getTargetRankStyle(val){
+  const rank=getRank(val);
+  const s=SUB_IDX[rank.sub]||0;
+  if(rank.name==='世界/WORLD'){
+    const lv=val>=94000?4:val>=93000?3:val>=92000?2:val>=91000?1:0;
+    const glows=[
+      [4,0.35],[9,0.52],[13,0.65],[18,0.78],[24,0.90]
+    ];
+    const [sz,op]=glows[lv];
+    const glowF=`drop-shadow(0 0 ${sz}px rgba(255,255,255,${op}))`;
+    const glowFHd=`drop-shadow(0 0 ${sz+5}px rgba(255,255,255,${Math.min(1,op+0.18)}))`;
+    const grad='background:linear-gradient(90deg,#ff6060,#ff9830,#f8f040,#40e880,#40a8ff,#c060ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;';
+    const rankStyle='background:linear-gradient(90deg,#ff9060,#60d080,#6090ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;';
+    return {valStyle:`${grad}filter:${glowF};`,headerValStyle:`${grad}filter:${glowFHd};`,rankStyle,glow:''};
+  }
+  const fn=RANK_COLORS[rank.name]||(()=>'#c8a840');
+  const col=fn(s);
+  const rankCol=fn(Math.max(0,s-1));
+  return {valStyle:`color:${col}`,headerValStyle:`color:${col}`,rankStyle:`color:${rankCol}`,glow:''};
+}
+function renderTarget(){
+  TARGET_PRESET_ROWS.flat().forEach(p=>{
+    const el=document.getElementById(`tp-${p.val}`);
+    if(el)el.classList.toggle('active',targetSkill===p.val);
+  });
+  const disp=document.getElementById('target-display');
+  if(!disp)return;
+  if(!targetSkill){ disp.style.display='none'; disp.style.boxShadow=''; return; }
+  const simD=buildSimData();
+  const total=grandTotal(simD);
+  const diff=targetSkill-total;
+  const tRank=getRank(targetSkill);
+  const rs=getTargetRankStyle(targetSkill);
+  disp.style.display='block';
+  disp.style.boxShadow=rs.glow||'';
+  disp.innerHTML=`
+    <div class="td-lbl">目標 FLARE SKILL</div>
+    <div class="td-val" style="${rs.valStyle}">${targetSkill.toLocaleString()}</div>
+    <div class="td-rank" style="${rs.rankStyle}">${fmtRank(tRank)}</div>
+    <div class="td-diff" style="color:${diff<=0?'#48d898':'#505068'}">${diff<=0?'✓ 達成':'あと '+diff.toLocaleString()}</div>`;
+}
+
+function getNote(entryId){
+  if(noteEdits[entryId]!==undefined) return noteEdits[entryId];
+  for(const cat of CATS){ const e=skillData[cat].find(e=>e.id===entryId); if(e) return e.note||''; }
+  const sne=simNewEntries.find(e=>e.id===entryId); if(sne) return sne.note||'';
+  const ce=candidateEntries.find(e=>e.id===entryId); return ce?.note||'';
+}
+function showNoteSection(entryId){
+  currentNoteId=entryId;
+  const note=getNote(entryId);
+  if(simMode==='candidate'){
+    const ta=document.getElementById('cand-note-area');
+    ta.value=note;
+    onNoteInput(ta);
+    document.getElementById('cand-note-section').style.display='';
+  } else {
+    const ta=document.getElementById('note-area');
+    ta.value=note;
+    onNoteInput(ta);
+    document.getElementById('note-section').style.display='';
+  }
+}
+function onNoteInput(el){
+  if(currentNoteId) noteEdits[currentNoteId]=el.value;
+  const n=el.value.length;
+  const ccId=el.id==='cand-note-area'?'cand-note-count':'note-count';
+  const cc=document.getElementById(ccId);
+  if(cc){ cc.textContent=n+'/140'; cc.className='comment-count'+(n>=140?' full':n>=120?' near':''); }
+  // pos色の更新（renderせず直接DOM操作）
+  document.querySelectorAll(`table.st tr[onclick*="'${CSS.escape(currentNoteId)}'"] td.pos`).forEach(td=>{
+    td.classList.toggle('has-note',!!el.value);
+  });
+}
+
+function selectRowForUpdate(cat, entryId){
+  if(window.innerWidth<=768) openMobRpane();
+  switchMode('update');
+  document.getElementById('u-cat').value=cat;
+  refreshUpdateSongs();
+  document.getElementById('u-song').value=entryId;
+  const entry=skillData[cat].find(e=>e.id===entryId);
+  if(entry) document.getElementById('u-rank').value=String(entry.rankIdx);
+  showNoteSection(entryId);
+  document.getElementById('rpane-body').scrollTop=0;
+}
+
+function resetSim(){
+  simNewEntries=[];simUpdateEntries=[];simDeleteEntries=[];editingNewId=null;simDirty=false;
+  if(!CATS.some(c=>skillData[c].length>0)){ sessionStyleLocked=false; renderStyleUI(); }
+  simComment=''; noteEdits={}; currentNoteId=null;
+  const ca=document.getElementById('sim-comment-area');
+  if(ca){ca.value=''; onCommentInput(ca);}
+  document.getElementById('note-section').style.display='none';
+  document.getElementById('cand-note-section').style.display='none';
+  document.getElementById('btn-add-entry').textContent='+ 追加';
+  document.getElementById('btn-add-entry').classList.remove('editing');
+  render();
+}
+function toggleSimColors(val){ showSimColors=val; render(); }
+function toggleSimOut(hide){ showSimOut=!hide; render(); }
+function onCommentInput(el){
+  simComment=el.value;
+  const n=simComment.length;
+  const cc=document.getElementById('comment-count');
+  cc.textContent=n+'/140';
+  cc.className='comment-count'+(n>=140?' full':n>=120?' near':'');
+}
+
+// ============================================================
+// Mobile
+// ============================================================
+const candOpen = { classic: false, white: false, gold: false };
+
+function toggleMobRpane() {
+  document.getElementById('right').classList.contains('mob-open') ? closeMobRpane() : openMobRpane();
+}
+function openMobRpane() {
+  document.getElementById('right').classList.add('mob-open');
+  document.getElementById('mob-overlay').classList.add('on');
+  document.getElementById('mob-fab').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeMobRpane() {
+  document.getElementById('right').classList.remove('mob-open');
+  document.getElementById('mob-overlay').classList.remove('on');
+  document.getElementById('mob-fab').classList.remove('active');
+  document.body.style.overflow = '';
+}
+// Adjust FAB/footer bottom for browser UI (Chrome tab bar, etc.)
+function adjustBottomUI(){
+  if(window.innerWidth>768) return;
+  const vvh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+  const wh=window.innerHeight;
+  const extra=Math.max(0,wh-vvh); // height consumed by browser bottom UI
+  const base=24+extra;
+  const fab=document.getElementById('mob-fab');
+  if(fab) fab.style.bottom=base+'px';
+  const footer=document.getElementById('mob-footer');
+  if(footer) footer.style.height=(80+extra)+'px';
+}
+if(window.visualViewport) window.visualViewport.addEventListener('resize',adjustBottomUI);
+window.addEventListener('resize',adjustBottomUI);
+
+function toggleCat(cat) {
+  if (window.innerWidth > 768) return;
+  document.querySelector(`.cat-col.${cat}`).classList.toggle('collapsed');
+  const allCollapsed = ['classic','white','gold'].every(c =>
+    document.querySelector(`.cat-col.${c}`).classList.contains('collapsed')
+  );
+  if (allCollapsed) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function toggleCandSection(cat) {
+  if (window.innerWidth > 768) return;
+  candOpen[cat] = !candOpen[cat];
+  renderCandidates();
+}
+
+// ============================================================
+// UI controls
+// ============================================================
+
+function switchMode(m, fromEdit=false){
+  simMode=m;
+  document.getElementById('modeBtn-new').classList.toggle('on',m==='new');
+  document.getElementById('modeBtn-update').classList.toggle('on',m==='update');
+  document.getElementById('modeBtn-candidate').classList.toggle('on',m==='candidate');
+  document.getElementById('form-new').style.display       =m==='new'       ?'':'none';
+  document.getElementById('form-update').style.display    =m==='update'    ?'':'none';
+  document.getElementById('form-candidate').style.display =m==='candidate' ?'':'none';
+  if(m==='update')refreshUpdateSongs();
+  if(m==='candidate'){
+    if(!fromEdit){
+      editingCandId=null;
+      document.getElementById('btn-add-cand').textContent='+ 候補に追加';
+      document.getElementById('btn-add-cand').classList.remove('editing');
+    }
+    document.getElementById('note-section').style.display='none';
+    currentNoteId=null;
+  }
+}
+
+// ============================================================
+// Candidates
+// ============================================================
+function addCandidateEntry(){
+  const cat=document.getElementById('c-cat').value;
+  const name=document.getElementById('c-name').value||'候補曲';
+  const diff=document.getElementById('c-diff').value;
+  const style=sessionStyle||'SP';
+  const level=parseInt(document.getElementById('c-level').value);
+  const rankIdx=parseInt(document.getElementById('c-rank').value);
+  const tier=document.getElementById('c-tier').value;
+  const fs=(FLARE_TABLE[level]||[])[rankIdx]||0;
+  if(editingCandId===null && candidateEntries.filter(e=>e.cat===cat).length>=30){
+    alert(`候補曲は${cat}カテゴリ最大30曲です`); return;
+  }
+  if(editingCandId!==null){
+    const idx=candidateEntries.findIndex(e=>e.id===editingCandId);
+    if(idx>=0)candidateEntries[idx]={...candidateEntries[idx],cat,name,diff,style,level,rankIdx,fs,tier};
+    editingCandId=null;
+    document.getElementById('btn-add-cand').textContent='+ 候補に追加';
+    document.getElementById('btn-add-cand').classList.remove('editing');
+  } else {
+    const newId=`cand_${simCounter++}`;
+    candidateEntries.push({id:newId,cat,name,diff,style,level,rankIdx,fs,tier});
+    candOpen[cat.toLowerCase()]=true; // auto-expand on mobile
+    render();
+    showNoteSection(newId);
+    return;
+  }
+  render();
+}
+function editCandidateEntry(id){
+  const e=candidateEntries.find(e=>e.id===id);if(!e)return;
+  switchMode('candidate', true);
+  editingCandId=id;
+  document.getElementById('c-cat').value=e.cat;
+  document.getElementById('c-name').value=e.name;
+  document.getElementById('c-diff').value=e.diff;
+  document.getElementById('c-level').value=String(e.level);
+  document.getElementById('c-rank').value=String(e.rankIdx);
+  document.getElementById('c-tier').value=e.tier;
+  document.getElementById('btn-add-cand').textContent='✓ 更新';
+  document.getElementById('btn-add-cand').classList.add('editing');
+  showNoteSection(id);
+  document.getElementById('rpane-body').scrollTop=0;
+}
+function removeCandidateEntry(id){
+  candidateEntries=candidateEntries.filter(e=>e.id!==id);
+  if(editingCandId===id){
+    editingCandId=null;
+    document.getElementById('btn-add-cand').textContent='+ 候補に追加';
+    document.getElementById('btn-add-cand').classList.remove('editing');
+  }
+  render();
+}
+function renderCandidates(){
+  for(const cat of CATS){
+    const catL=cat.toLowerCase();
+    const sec=document.getElementById(`cand-${catL}`);
+    const tbody=document.getElementById(`cand-tbody-${catL}`);
+    const headEl=document.getElementById(`cand-head-${catL}`);
+    if(!sec||!tbody)continue;
+    const catCands=candidateEntries.filter(e=>e.cat===cat)
+      .sort((a,b)=>['SOON','MID','LONG'].indexOf(a.tier)-['SOON','MID','LONG'].indexOf(b.tier));
+    sec.style.display=catCands.length?'':'none';
+    sec.classList.toggle('cand-open',!!candOpen[catL]);
+    if(headEl) headEl.innerHTML=`<span>CANDIDATES <span style="color:#404070">(${catCands.length})</span></span><span class="cand-toggle-icon"></span>`;
+    tbody.innerHTML=catCands.map(e=>{
+      const hasNote=!!(noteEdits[e.id]!==undefined?noteEdits[e.id]:e.note);
+      return `<tr class="row-clickable" onclick="editCandidateEntry('${esc(e.id)}')">
+        <td class="pos${hasNote?' has-note':''}">●</td>
+        <td class="sname" title="${esc(e.name)}">${esc(e.name)}</td>
+        <td><span class="tier-badge tier-${esc(e.tier)}">${esc(e.tier)}</span></td>
+        <td>${diffSpan(e.diff,e.style)}</td>
+        <td class="lv">${e.level}</td>
+        <td>${rb(e.rankIdx)}</td>
+        <td class="fsv">${e.fs}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+function refreshUpdateSongs(){
+  const cat=document.getElementById('u-cat').value;
+  const sel=document.getElementById('u-song');
+  const prev=sel.value;
+  const simNewIds=new Set(simNewEntries.map(e=>e.id));
+  sel.innerHTML=top30(buildSimData()[cat]).map(e=>
+    `<option value="${esc(e.id)}">${simNewIds.has(e.id)?'[NEW] ':''}[Lv${e.level} ${RANK_NAMES[e.rankIdx]}] ${esc(e.name)}</option>`
+  ).join('');
+  if(prev) sel.value=prev;
+}
+// ============================================================
+// UUID Modal
+// ============================================================
+function showModal(uuid){
+  const url=location.origin+location.pathname+'?id='+uuid;
+  document.getElementById('modal-url-text').textContent=url;
+  document.getElementById('copy-feedback').textContent='';
+  document.getElementById('uuid-modal').classList.add('on');
+}
+function closeModal(){ document.getElementById('uuid-modal').classList.remove('on'); }
+function shareOnX(){
+  const url=document.getElementById('modal-url-text').textContent;
+  const total=document.getElementById('hd-total-val').textContent;
+  const rank=document.getElementById('hd-rank-val').textContent;
+  const comment=simComment.trim();
+  // styleはロード済みデータ or 新規エントリの先頭から判定
+  const allEntries=[...CATS.flatMap(c=>skillData[c]),...simNewEntries];
+  const style=allEntries.length>0?(allEntries[0].style||'SP'):'SP';
+  const base=`DDR ${style} フレアスキル: ${total} (${rank}) のシミュレーション #DDR_FLARESIM`;
+  // X: CJK文字は2カウント、URLは23固定。上限280
+  const xLen=s=>[...s].reduce((n,c)=>n+(/[\u3000-\u9fff\uff00-\uffef]/.test(c)?2:1),0);
+  const urlCount=23;
+  const budget=280-xLen(base)-1-urlCount; // 1は改行分
+  const commentTrimmed=comment?trimToXBudget(comment,budget):'';
+  const text=commentTrimmed?`${base}\n${commentTrimmed}`:base;
+  window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,'_blank');
+}
+function trimToXBudget(str,budget){
+  let count=0;
+  let i=0;
+  for(;i<str.length;i++){
+    const w=/[\u3000-\u9fff\uff00-\uffef]/.test(str[i])?2:1;
+    if(count+w>budget)break;
+    count+=w;
+  }
+  return str.slice(0,i);
+}
+function copyModalURL(){
+  const url=document.getElementById('modal-url-text').textContent;
+  const feedback=()=>{
+    document.getElementById('copy-feedback').textContent='コピーしました';
+    setTimeout(()=>document.getElementById('copy-feedback').textContent='',2000);
+  };
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(feedback).catch(()=>fallbackCopy(url,feedback));
+  } else { fallbackCopy(url,feedback); }
+}
+function fallbackCopy(text,cb){
+  const ta=document.createElement('textarea');
+  ta.value=text;ta.style.cssText='position:fixed;opacity:0';
+  document.body.appendChild(ta);ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  if(cb)cb();
+}
+
+// ============================================================
+// Image export
+// ============================================================
+async function saveAsImage(){
+  const btn=document.getElementById('btn-image');
+  btn.textContent='...'; btn.disabled=true;
+  const origZoom=document.body.style.zoom;
+  try{
+    const opts={backgroundColor:'#08080f',scale:3,useCORS:true,logging:false};
+
+    // body zoom を一時リセット（html2canvas のレイアウト計算がズームの影響を受けるため）
+    document.body.style.zoom='1';
+
+    // -- Center clone: sticky解除・sim-out行非表示・30行フル表示 --
+    const CENTER_W=950;
+    const centerOrig=document.getElementById('center');
+    const centerClone=centerOrig.cloneNode(true);
+    centerClone.querySelectorAll('.cat-head').forEach(el=>el.style.position='static');
+    centerClone.querySelectorAll('th').forEach(el=>el.style.position='static');
+    centerClone.querySelectorAll('tr.sim-out').forEach(el=>el.style.display='none');
+    // Force PC layout (override mobile CSS flex-direction:column)
+    centerClone.querySelectorAll('.cat-col').forEach(col=>{
+      col.style.flex='1'; col.style.minWidth='0';
+      col.style.borderRight='1px solid #101018'; col.style.borderBottom='none';
+      col.classList.remove('collapsed');
+    });
+    centerClone.querySelectorAll('.cand-section').forEach(el=>el.classList.add('cand-open'));
+    centerClone.style.cssText=`position:fixed;left:-9999px;top:0;width:${CENTER_W}px;display:flex;flex-direction:row;background:#08080f;flex-shrink:0;`;
+    document.body.appendChild(centerClone);
+
+    // -- Right pane clone: 編集ブロック非表示・統計情報等フル表示 --
+    const rpaneOrig=document.getElementById('rpane-body');
+    const rpaneClone=rpaneOrig.cloneNode(true);
+    // 編集ブロック・CHANGES・トグル非表示
+    rpaneClone.querySelectorAll('.mode-row,.sr-section-changes,#sim-color-toggle-row').forEach(el=>el.style.display='none');
+    ['form-new','form-update','new-entries-list','update-entries-list','delete-entries-list','target-section','sim-changes','form-candidate','mob-stats','mob-rpane-close'].forEach(id=>{
+      const el=rpaneClone.querySelector('#'+id);
+      if(el)el.style.display='none';
+    });
+    // コメント: textareaをdivに差し替えて確実にレンダリング
+    const clonedComment=rpaneClone.querySelector('#sim-comment-area');
+    if(clonedComment){
+      const commentDiv=document.createElement('div');
+      commentDiv.style.cssText='background:#0b0b18;border:1px solid #1a1a30;color:#b0b0c8;padding:6px 8px;border-radius:4px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all;min-height:20px;';
+      commentDiv.textContent=simComment;
+      clonedComment.replaceWith(commentDiv);
+    }
+    // コメントが空なら comment-section ごと非表示
+    const clonedCommentSection=rpaneClone.querySelector('#sim-comment-section');
+    if(clonedCommentSection&&!simComment.trim()) clonedCommentSection.style.display='none';
+    // target-display: -webkit-background-clip:text はhtml2canvas非対応なのでsolidカラーに差し替え
+    // WORLD虹色: -webkit-background-clip:text はhtml2canvas非対応 → canvas描画でimg差し替え
+    if(targetSkill){
+      const _lv=targetSkill>=94000?4:targetSkill>=93000?3:targetSkill>=92000?2:targetSkill>=91000?1:0;
+      const _glows=[[4,0.35],[9,0.52],[13,0.65],[18,0.78],[24,0.90]];
+      const [_sz,_op]=_glows[_lv];
+      rpaneClone.querySelectorAll('#target-display .td-val,#target-display .td-rank').forEach(el=>{
+        if(!(el.style.cssText||'').includes('text-fill-color')) return;
+        const isVal=el.classList.contains('td-val');
+        const fontSize=isVal?26:13;
+        const text=el.textContent;
+        const c=document.createElement('canvas');
+        const ctx=c.getContext('2d');
+        const pad=_sz+4;
+        ctx.font=`${isVal?'700':'400'} ${fontSize}px sans-serif`;
+        const tw=Math.ceil(ctx.measureText(text).width)+4;
+        const th=Math.ceil(fontSize*1.4);
+        c.width=tw+pad*2; c.height=th+pad*2;
+        ctx.font=`${isVal?'700':'400'} ${fontSize}px sans-serif`;
+        const g=ctx.createLinearGradient(pad,0,tw+pad,0);
+        if(isVal){
+          g.addColorStop(0,'#ff6060');g.addColorStop(0.2,'#ff9830');
+          g.addColorStop(0.4,'#f8f040');g.addColorStop(0.6,'#40e880');
+          g.addColorStop(0.8,'#40a8ff');g.addColorStop(1,'#c060ff');
+        } else {
+          g.addColorStop(0,'#ff9060');g.addColorStop(0.5,'#60d080');g.addColorStop(1,'#6090ff');
+        }
+        ctx.shadowBlur=_sz*2; ctx.shadowColor=`rgba(255,255,255,${_op})`;
+        ctx.fillStyle=g; ctx.textBaseline='top'; ctx.fillText(text,pad+2,pad+2);
+        const img=document.createElement('img');
+        img.src=c.toDataURL();
+        img.style.cssText=`height:${th+pad*2}px;display:inline-block;vertical-align:middle;margin:${-pad}px 0;`;
+        el.style.cssText='display:inline-block;';
+        el.innerHTML=''; el.appendChild(img);
+      });
+    }
+    const RPANE_W=360;
+    rpaneClone.style.cssText=`position:fixed;left:-9999px;top:0;width:${RPANE_W}px;background:#07070d;padding:12px;overflow:visible;`;
+    document.body.appendChild(rpaneClone);
+
+    // -- Header clone: UUIDを末尾に追記・SP/DPトグル→バッジ --
+    const headerOrig=document.getElementById('header');
+    const headerClone=headerOrig.cloneNode(true);
+    // トグルを非表示にしてバッジを表示
+    const cloneToggle=headerClone.querySelector('#hd-style-toggle');
+    if(cloneToggle) cloneToggle.style.display='none';
+    const cloneBadge=headerClone.querySelector('#hd-style-badge');
+    if(cloneBadge){ cloneBadge.textContent=sessionStyle||'SP'; cloneBadge.style.display=''; }
+    const cloneUUID=headerClone.querySelector('#hd-uuid');
+    if(cloneUUID) cloneUUID.style.display='none';
+    const HEADER_W=CENTER_W+RPANE_W;
+    headerClone.style.cssText=`position:fixed;left:-9999px;top:0;width:${HEADER_W}px;display:flex;align-items:center;background:linear-gradient(180deg,#0e0e20 0%,#090910 100%);padding:10px 20px;gap:18px;`;
+    document.body.appendChild(headerClone);
+
+    const [hc,cc,rc]=await Promise.all([
+      html2canvas(headerClone,opts),
+      html2canvas(centerClone,opts),
+      html2canvas(rpaneClone,opts),
+    ]);
+
+    document.body.removeChild(headerClone);
+    document.body.removeChild(centerClone);
+    document.body.removeChild(rpaneClone);
+    document.body.style.zoom=origZoom;
+
+    // header全幅 + center/right横並び
+    const bodyW=cc.width+rc.width;
+    const bodyH=Math.max(cc.height,rc.height);
+    const combined=document.createElement('canvas');
+    combined.width=Math.max(hc.width,bodyW);
+    combined.height=hc.height+bodyH;
+    const ctx=combined.getContext('2d');
+    ctx.fillStyle='#08080f';
+    ctx.fillRect(0,0,combined.width,combined.height);
+    ctx.drawImage(hc,0,0,combined.width,hc.height);
+    ctx.drawImage(cc,0,hc.height);
+    ctx.drawImage(rc,cc.width,hc.height);
+
+    const a=document.createElement('a');
+    a.download=`flare-skill-${new Date().toISOString().slice(0,10)}.png`;
+    a.href=combined.toDataURL('image/png');
+    a.click();
+  }catch(e){
+    document.body.style.zoom=origZoom;
+    alert('画像化失敗: '+e.message);
+  }
+  btn.textContent='画像としてDL'; btn.disabled=false;
+}
+
+// ============================================================
+// Supabase
+// ============================================================
+let supabaseClient=null,currentUUID=null;
+function setStatus(msg,isError=false){
+  const el=document.getElementById('import-status');
+  el.textContent=msg;
+  el.classList.toggle('error',isError);
+}
+function initSupabase(){
+  if(typeof SUPABASE_URL==='undefined'||typeof SUPABASE_ANON_KEY==='undefined')return;
+  supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+}
+function updateSaveBtnLabel(){
+  const btn=document.getElementById('btn-save');
+  if(!btn||btn.style.display==='none')return;
+  btn.textContent='シミュレーションを保存';
+}
+function updateActionButtons(){
+  const isEmpty=CATS.every(c=>skillData[c].length===0);
+  ['btn-image','btn-json-dl','btn-save'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.disabled=isEmpty; el.style.opacity=isEmpty?'0.35':''; }
+  });
+}
+async function loadFromSupabase(uuid){
+  if(!supabaseClient){setStatus('⚠ config.js未設定',true);return;}
+  setStatus('loading...');
+  const{data,error}=await supabaseClient.from('skill_data').select('data,updated_at,last_accessed').eq('uuid',uuid).single();
+  if(error||!data){setStatus('⚠ データが見つかりません（URLが誤っているか、保存期限が切れた可能性があります）',true);return;}
+  const loaded=data.data;
+  candidateEntries=loaded._candidates||[];
+  skillData={CLASSIC:loaded.CLASSIC||[],WHITE:loaded.WHITE||[],GOLD:loaded.GOLD||[]};
+  targetSkill=loaded._targetSkill??null;
+  const tEl=document.getElementById('target-val');
+  if(tEl) tEl.value=targetSkill!=null?targetSkill:'';
+  simComment=loaded._comment||'';
+  const ca=document.getElementById('sim-comment-area');
+  if(ca){ca.value=simComment;onCommentInput(ca);}
+  normalizeFsFields(skillData);
+  ensureIds(skillData);
+  const detected=detectStyleFromData(skillData);
+  sessionStyle=detected||'SP'; sessionStyleLocked=!!detected;
+  renderStyleUI();
+  simNewEntries=[];simUpdateEntries=[];currentUUID=uuid;
+  noteEdits={};currentNoteId=null;editingCandId=null;
+  document.getElementById('note-section').style.display='none';
+  const saved=(data.updated_at||'').split('T')[0];
+  const accessed=data.last_accessed?data.last_accessed.split('T')[0]:'';
+  document.getElementById('import-status').textContent=`保存:${saved}　最終アクセス:${accessed}`;
+  document.getElementById('hd-uuid-val').textContent=uuid;
+  document.getElementById('hd-uuid').style.display='';
+  setUUIDDisplay(uuid);
+  document.getElementById('btn-save').style.display='';
+  updateSaveBtnLabel();
+  if(data.last_accessed) checkTTL(data.last_accessed);
+  simDirty=false;
+  refreshUpdateSongs();render();
+  Promise.resolve(supabaseClient.rpc('touch_last_accessed',{record_uuid:uuid})).catch(()=>{});
+}
+async function saveToSupabase(){
+  if(!supabaseClient){alert('config.js が読み込まれていません');return;}
+  const btn=document.getElementById('btn-save');
+  btn.textContent='保存中...';btn.disabled=true;
+  const hasNoteChanges=Object.keys(noteEdits).length>0;
+  const saveData=(hasSimActive()||hasNoteChanges)?buildSimData(true):JSON.parse(JSON.stringify(skillData));
+  const savedCandidates=candidateEntries.map(e=>noteEdits[e.id]!==undefined?{...e,note:noteEdits[e.id]}:e);
+  if(savedCandidates.length>0) saveData._candidates=savedCandidates;
+  if(targetSkill!=null) saveData._targetSkill=targetSkill;
+  if(simComment) saveData._comment=simComment;
+  const{data,error}=await supabaseClient.from('skill_data')
+    .insert({data:saveData}).select('uuid').single();
+  if(error||!data){alert('保存失敗: '+(error?.message||'不明'));}
+  else{
+    currentUUID=data.uuid;
+    history.replaceState(null,'','?id='+data.uuid);
+    document.getElementById('import-status').textContent='✓ saved';
+    setUUIDDisplay(data.uuid);
+    simDirty=false;
+    showModal(data.uuid);
+  }
+  btn.disabled=false;
+  updateSaveBtnLabel();
+}
+
+// ============================================================
+// TTL
+// ============================================================
+function checkTTL(lastAccessed){
+  const days=Math.floor((Date.now()-new Date(lastAccessed))/(1000*60*60*24));
+  const daysLeft=90-days;
+  if(daysLeft<=30) showTTLModal(daysLeft);
+}
+function showTTLModal(daysLeft){
+  const msg=daysLeft<=0
+    ?'90日間アクセスがなかったため、このデータは削除対象になっていました。今回のアクセスにより90日間延長されました。JSONダウンロードでバックアップすることをお勧めします。'
+    :`データの有効期限まで残り <strong>${daysLeft}日</strong> です。アクセスにより90日間延長されました。`;
+  document.getElementById('ttl-modal-msg').innerHTML=msg;
+  document.getElementById('ttl-modal').classList.add('on');
+}
+function closeTTLModal(){ document.getElementById('ttl-modal').classList.remove('on'); }
+function openHelp(){
+  document.getElementById('help-modal').classList.add('on');
+  const el=document.getElementById('bml-code');
+  const src=document.getElementById('bml-source');
+  if(el&&src) el.textContent=src.textContent.trim();
+}
+function closeHelp(){ document.getElementById('help-modal').classList.remove('on'); }
+function copyBookmarklet(btn){
+  const src=document.getElementById('bml-source');
+  if(!src)return;
+  navigator.clipboard.writeText(src.textContent.trim()).then(()=>{
+    btn.textContent='コピーしました！';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='コードをコピー';btn.classList.remove('copied');},2000);
+  });
+}
+function setUUIDDisplay(uuid){
+  const mel=document.getElementById('mob-uuid-display');
+  if(mel){ mel.textContent=uuid||''; mel.style.display=uuid?'block':'none'; }
+}
+
+// ============================================================
+// JSON DL / Import
+// ============================================================
+function downloadJSON(){
+  const exportData={
+    version:1,
+    exported_at:new Date().toISOString(),
+    uuid:currentUUID||null,
+    skillData:JSON.parse(JSON.stringify(skillData)),
+    candidateEntries:JSON.parse(JSON.stringify(candidateEntries)),
+    noteEdits:JSON.parse(JSON.stringify(noteEdits)),
+  };
+  const blob=new Blob([JSON.stringify(exportData,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`flare-skill-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function triggerJSONImport(){ document.getElementById('json-file-input').click(); }
+function importJSONFile(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!d.skillData||!d.skillData.CLASSIC)throw new Error('形式が不正です');
+      skillData={CLASSIC:d.skillData.CLASSIC||[],WHITE:d.skillData.WHITE||[],GOLD:d.skillData.GOLD||[]};
+      normalizeFsFields(skillData);
+      ensureIds(skillData);
+      const detected=detectStyleFromData(skillData);
+      sessionStyle=detected||'SP'; sessionStyleLocked=!!detected;
+      renderStyleUI();
+      candidateEntries=d.candidateEntries||[];
+      noteEdits=d.noteEdits||{};
+      simNewEntries=[];simUpdateEntries=[];simDeleteEntries=[];
+      currentNoteId=null;editingCandId=null;editingNewId=null;
+      document.getElementById('note-section').style.display='none';
+      document.getElementById('import-status').textContent=`✓ JSON: ${file.name}`;
+      if(d.uuid){
+        currentUUID=d.uuid;
+        document.getElementById('hd-uuid-val').textContent=d.uuid;
+        document.getElementById('hd-uuid').style.display='';
+        setUUIDDisplay(d.uuid);
+        if(supabaseClient) document.getElementById('btn-save').style.display='';
+      }
+      simDirty=false;
+      refreshUpdateSongs();render();
+    }catch(err){
+      setStatus(`✗ ${err.message}`,true);
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+// ============================================================
+// Init
+// ============================================================
+(function init(){
+  [document.getElementById('n-level'),document.getElementById('c-level')].forEach(lv=>{
+    for(let v=19;v>=1;v--){const o=document.createElement('option');o.value=v;o.textContent=v;if(v===17)o.selected=true;lv.appendChild(o);}
+  });
+  [document.getElementById('n-rank'),document.getElementById('u-rank'),document.getElementById('c-rank')].forEach(sel=>{
+    [...RANK_NAMES].slice(1).reverse().forEach((n,i)=>{
+      const o=document.createElement('option');o.value=10-i;o.textContent=n;sel.appendChild(o);
+    });
+  });
+  sessionStyle='SP'; sessionStyleLocked=false; renderStyleUI();
+  refreshUpdateSongs();render();
+  initTargetPresets();
+  initSupabase();
+  const urlId=new URLSearchParams(location.search).get('id');
+  if(urlId){currentUUID=urlId;loadFromSupabase(urlId);}
+  else if(supabaseClient){document.getElementById('btn-save').style.display='';}
+  window.addEventListener('beforeunload',e=>{
+    if(simDirty){e.preventDefault();e.returnValue='';}
+  });
+})();
+
+function goHome(){
+  location.href=location.pathname;
+}
+</script>
+<script id="bml-source" type="text/plain">javascript:void((function(){var S='https://harug5152.github.io/ddr-flareskill-simulator/',U='https://ddxzgrknjvxtvcukwngm.supabase.co',K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkeHpncmtuanZ4dHZjdWt3bmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1ODM3MDMsImV4cCI6MjA4OTE1OTcwM30.UjWJWhI6g_j54qpr4okmwmGOna2bA33QGwULv1G-neM',C={flareskill_classic_table:'CLASSIC',flareskill_white_table:'WHITE',flareskill_gold_table:'GOLD'},D={BEGINNER:'b',BASIC:'B',DIFFICULT:'D',EXPERT:'E',CHALLENGE:'C'},st=location.href.includes('flare_data_double')?'DP':'SP',r={CLASSIC:[],WHITE:[],GOLD:[]};function rk(s){if(!s)return 0;if(s.indexOf('flare_ex')>=0)return 10;var m=s.match(/flare_(\d+)/);return m?parseInt(m[1]):0;}for(var cls in C){var cat=C[cls],rows=document.querySelectorAll('tr.'+cls);for(var i=0;i<rows.length;i++){var tds=rows[i].querySelectorAll('td');if(tds.length<4)continue;var name=((tds[0].querySelector('a')||{}).textContent||'不明').trim();if(name.indexOf('Steps to the Star')>=0)continue;var txt=tds[1].textContent,dm=txt.match(/(BEGINNER|BASIC|DIFFICULT|EXPERT|CHALLENGE)/i);if(!dm)continue;var diff=dm[1].toUpperCase();if(!D[diff])continue;var lm=txt.match(/Lv\.?(\d+)/i),level=lm?parseInt(lm[1]):1,img=tds[2].querySelector('img'),ri=rk(img?img.src:''),fs=parseInt((tds[3]||{}).textContent||'0')||0,date=((tds[4]||{}).textContent||'').trim().split(' ')[0]||'0000-00-00';r[cat].push({name:name,diff:diff,style:st,level:level,rankIdx:ri,fs:fs,date:date});}}var tot=r.CLASSIC.length+r.WHITE.length+r.GOLD.length;if(tot===0){alert('フレアスキルデータが見つかりません。\nフレアスキルページで実行してください。');return;}fetch(U+'/rest/v1/skill_data',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K,'Prefer':'return=representation'},body:JSON.stringify({data:r})}).then(function(res){return res.json();}).then(function(d){var uuid=Array.isArray(d)?d[0].uuid:d.uuid;if(!uuid){alert('UUID取得失敗');return;}window.open(S+'?id='+uuid,'_blank');}).catch(function(e){alert('通信エラー: '+e.message);});}()))</script>
+</body>
+</html>
