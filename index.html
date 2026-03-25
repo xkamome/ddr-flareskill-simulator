@@ -1132,7 +1132,7 @@ let currentNoteId    = null;
 let candidateEntries = [];   // [{id,cat,name,diff,level,rankIdx,fs,tier}]
 let editingCandId    = null;
 let targetSkill      = null;
-let candPreviewActive = false;
+let candPreviewTier = null; // null | 'SOON' | 'MID' | 'LONG'
 
 // ============================================================
 // Core helpers
@@ -1190,8 +1190,11 @@ function buildSimData(withFlags=false) {
     }
   });
   // 候補曲プレビューが有効な場合、候補曲をシミュレーションデータに統合
-  if(candPreviewActive){
-    candidateEntries.forEach(e=>{
+  if(candPreviewTier){
+    const tierOrder=['SOON','MID','LONG'];
+    const maxIdx=tierOrder.indexOf(candPreviewTier);
+    const activeTiers=new Set(tierOrder.slice(0,maxIdx+1));
+    candidateEntries.filter(e=>activeTiers.has(e.tier)).forEach(e=>{
       const existIdx=d[e.cat].findIndex(ex=>ex.id===e.id);
       if(existIdx>=0){
         if(e.rankIdx>d[e.cat][existIdx].rankIdx){
@@ -1252,7 +1255,7 @@ function renderTable(cat){
 
   document.getElementById(`fs-${cat.toLowerCase()}`).textContent=newTotal.toLocaleString();
   const dEl=document.getElementById(`d-${cat.toLowerCase()}`);
-  if((hasSimActive()||candPreviewActive)&&delta!==0){
+  if((hasSimActive()||candPreviewTier)&&delta!==0){
     dEl.textContent=dStr(delta);
     dEl.style.color=delta>0?'#48d898':'#d84848';
   } else { dEl.textContent=''; }
@@ -1447,7 +1450,7 @@ function renderSimResult(){
 }
 
 function buildStatsHtml(){
-  const simD=(hasSimActive()||candPreviewActive)?buildSimData():null;
+  const simD=(hasSimActive()||candPreviewTier)?buildSimData():null;
   function dist(data,cat){
     const d={};
     top30(data[cat]).forEach(e=>{const k=`Lv${e.level} ${RANK_NAMES[e.rankIdx]}`;d[k]=(d[k]||0)+1;});
@@ -1998,24 +2001,39 @@ function renderCandidates(){
     }).join('');
   }
 }
+const CAND_PREVIEW_CYCLE = [null, 'SOON', 'MID', 'LONG'];
+const CAND_PREVIEW_LABELS = {
+  null: '候補プレビュー ▶',
+  SOON: 'SOON のみ ▶',
+  MID:  'SOON + MID ▶',
+  LONG: 'SOON + MID + LONG ▶',
+};
+const CAND_PREVIEW_COLORS = { SOON:'#c04040', MID:'#b07030', LONG:'#4070b0' };
 function toggleCandPreview(){
-  candPreviewActive = !candPreviewActive;
+  const idx = CAND_PREVIEW_CYCLE.indexOf(candPreviewTier);
+  candPreviewTier = CAND_PREVIEW_CYCLE[(idx+1) % CAND_PREVIEW_CYCLE.length];
   const btn = document.getElementById('btn-cand-preview');
-  if(btn) btn.classList.toggle('active', candPreviewActive);
-  if(btn) btn.textContent = candPreviewActive ? '全候補プレビュー ✕' : '全候補をプレビュー ▶';
+  if(btn){
+    btn.classList.toggle('active', candPreviewTier !== null);
+    btn.textContent = CAND_PREVIEW_LABELS[candPreviewTier];
+  }
   render();
 }
 function renderCandPreview(){
   const el = document.getElementById('cand-preview-result');
   if(!el) return;
-  if(!candPreviewActive || candidateEntries.length === 0){
-    el.style.display = 'none';
-    return;
-  }
+  if(!candPreviewTier || candidateEntries.length === 0){ el.style.display='none'; return; }
   el.style.display = '';
-  el.innerHTML = `<div class="cprev-header" style="display:flex;align-items:center;gap:6px;">
-    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#28a0c8;"></span>
-    CANDIDATE PREVIEW 有効 — ${candidateEntries.length} 曲をシミュレーションに追加中
+  const tierOrder = ['SOON','MID','LONG'];
+  const maxIdx = tierOrder.indexOf(candPreviewTier);
+  const activeTiers = tierOrder.slice(0, maxIdx+1);
+  const badges = activeTiers.map(t=>
+    `<span class="tier-badge tier-${t}" style="font-size:10px;">${t}</span>`
+  ).join('<span style="color:#303050;margin:0 2px;">+</span>');
+  const count = candidateEntries.filter(e=>activeTiers.includes(e.tier)).length;
+  el.innerHTML = `<div class="cprev-header" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#28a0c8;flex-shrink:0;"></span>
+    <span>CANDIDATE PREVIEW：</span>${badges}<span style="color:#404060;">(${count} 曲)</span>
   </div>`;
 }
 function refreshUpdateSongs(){
