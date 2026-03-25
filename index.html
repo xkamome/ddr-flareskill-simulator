@@ -418,6 +418,22 @@ table.stats-tbl td.sv-dlt.neg { color: #d84848; }
 /* ── Note dot ── */
 /* ── Candidate section (center) ── */
 .cand-section { margin-top: 12px; border-top: 1px dashed #252540; }
+#btn-cand-preview { width:100%; margin-top:8px; background:#0c1020; border-color:#1e2840; color:#4870a0; }
+#btn-cand-preview:hover { background:#101828; color:#6898c8; }
+#btn-cand-preview.active { background:#0a1a10; border-color:#183828; color:#48a870; }
+#cand-preview-result { display:none; background:#0a0a1a; border:1px solid #1e2040; border-radius:6px; padding:10px 14px; margin-bottom:8px; }
+.cprev-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cprev-block { text-align:center; }
+.cprev-block .cprev-lbl { font-size:9px; color:#404060; letter-spacing:0.5px; margin-bottom:2px; }
+.cprev-block .cprev-val { font-size:18px; font-weight:700; }
+.cprev-base { color:#5858a0; }
+.cprev-new  { color:#48d898; }
+.cprev-arrow { color:#303050; font-size:16px; }
+.cprev-delta { font-size:15px; font-weight:700; }
+.cprev-rank  { font-size:11px; color:#c8a840; white-space:nowrap; }
+.cprev-header { font-size:9px; color:#404070; letter-spacing:0.5px; margin-bottom:6px; }
+.cand-prev-on td.fsv { color:#48a870 !important; }
+.cand-prev-on td.pos { color:#48a870 !important; }
 .cand-head { padding: 5px 10px; font-size: 10px; font-weight: 600; color: #5050a0; letter-spacing: 1.5px; }
 .tier-badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 700; white-space: nowrap; }
 .tier-SOON { background: #1a0808; border: 1px solid #3a1010; color: #c04040; }
@@ -844,6 +860,7 @@ table.cand-tbl th:nth-child(7),table.cand-tbl td:nth-child(7){width:38px;text-al
           </select>
         </div>
         <button class="btn-add" id="btn-add-cand" onclick="addCandidateEntry()">+ 候補に追加</button>
+        <button class="btn-sm" id="btn-cand-preview" onclick="toggleCandPreview()">全候補をプレビュー ▶</button>
         <div id="cand-note-section" style="display:none">
           <div class="note-label">SONG NOTE</div>
           <textarea id="cand-note-area" maxlength="140" placeholder="この曲へのメモ（140字以内）" oninput="onNoteInput(this)"></textarea>
@@ -888,6 +905,7 @@ table.cand-tbl th:nth-child(7),table.cand-tbl td:nth-child(7){width:38px;text-al
       <div id="new-entries-list" class="sim-pending-list"></div>
       <div id="update-entries-list" class="sim-pending-list"></div>
       <div id="delete-entries-list" class="sim-pending-list"></div>
+      <div id="cand-preview-result"></div>
       <div id="candidate-list" class="sim-pending-list"></div>
 
     </div>
@@ -1112,6 +1130,7 @@ let currentNoteId    = null;
 let candidateEntries = [];   // [{id,cat,name,diff,level,rankIdx,fs,tier}]
 let editingCandId    = null;
 let targetSkill      = null;
+let candPreviewActive = false;
 
 // ============================================================
 // Core helpers
@@ -1170,6 +1189,25 @@ function buildSimData(withFlags=false) {
   });
   // noteEditsを全エントリに適用
   CATS.forEach(cat=>{ d[cat].forEach(e=>{ if(noteEdits[e.id]!==undefined) e.note=noteEdits[e.id]; }); });
+  return d;
+}
+
+function buildCandPreviewData() {
+  const d = buildSimData();
+  const today = new Date().toISOString().slice(0, 10);
+  candidateEntries.forEach(e => {
+    const existIdx = d[e.cat].findIndex(ex => ex.id === e.id);
+    if (existIdx >= 0) {
+      if (e.rankIdx > d[e.cat][existIdx].rankIdx) {
+        d[e.cat][existIdx].rankIdx = e.rankIdx;
+        d[e.cat][existIdx].fs = e.fs;
+        d[e.cat][existIdx].date = today;
+        d[e.cat][existIdx]._candPrev = true;
+      }
+    } else {
+      d[e.cat].push({...e, date: today, _candPrev: true});
+    }
+  });
   return d;
 }
 
@@ -1515,6 +1553,7 @@ function render(){
   renderDeleteList();
   renderSimResult();
   renderCandidates();
+  renderCandPreview();
   renderPendingList(
     candidateEntries.map(e=>({...e,infoStr:`${e.tier} ${e.cat} Lv${e.level} ${RANK_NAMES[e.rankIdx]}`})),
     'candidate-list','editCandidateEntry','removeCandidateEntry'
@@ -1957,6 +1996,56 @@ function renderCandidates(){
     }).join('');
   }
 }
+function toggleCandPreview(){
+  candPreviewActive = !candPreviewActive;
+  const btn = document.getElementById('btn-cand-preview');
+  if(btn) btn.classList.toggle('active', candPreviewActive);
+  if(btn) btn.textContent = candPreviewActive ? '全候補プレビュー ✕' : '全候補をプレビュー ▶';
+  renderCandPreview();
+  // 候補曲テーブルの行に視覚的な強調を付ける
+  document.querySelectorAll('.cand-section').forEach(s=>s.classList.toggle('cand-prev-on', candPreviewActive));
+}
+function renderCandPreview(){
+  const el = document.getElementById('cand-preview-result');
+  if(!el) return;
+  if(!candPreviewActive || candidateEntries.length === 0){
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = '';
+  const baseData = hasSimActive() ? buildSimData() : skillData;
+  const base = grandTotal(baseData);
+  const withCands = grandTotal(buildCandPreviewData());
+  const delta = withCands - base;
+  const rankBase = getRank(base);
+  const rankNew  = getRank(withCands);
+  const rankUp   = rankBase.name !== rankNew.name || rankBase.sub !== rankNew.sub;
+  // カテゴリ別の変化
+  const catRows = CATS.map(cat=>{
+    const b = catTotal(baseData[cat]);
+    const n = catTotal(buildCandPreviewData()[cat]);
+    const d = n - b;
+    if(d === 0) return '';
+    return `<span style="font-size:10px;color:#404060;">${cat} <span class="${dCls(d)}">${dStr(d)}</span></span>`;
+  }).filter(Boolean).join('<span style="color:#252540;margin:0 4px;">|</span>');
+  el.innerHTML = `
+    <div class="cprev-header">CANDIDATE PREVIEW — ${candidateEntries.length} 曲</div>
+    <div class="cprev-row">
+      <div class="cprev-block">
+        <div class="cprev-lbl">現在</div>
+        <div class="cprev-val cprev-base">${base.toLocaleString()}</div>
+      </div>
+      <div class="cprev-arrow">→</div>
+      <div class="cprev-block">
+        <div class="cprev-lbl">全候補達成後</div>
+        <div class="cprev-val cprev-new">${withCands.toLocaleString()}</div>
+      </div>
+      <div class="cprev-delta ${dCls(delta)}">${dStr(delta)}</div>
+      ${rankUp ? `<div class="cprev-rank">🎉 ${fmtRank(rankBase)} → ${fmtRank(rankNew)}</div>` : ''}
+    </div>
+    ${catRows ? `<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">${catRows}</div>` : ''}
+  `;
+}
 function refreshUpdateSongs(){
   const cat=document.getElementById('u-cat').value;
   const sel=document.getElementById('u-song');
@@ -2367,6 +2456,6 @@ function goHome(){
   location.href=location.pathname;
 }
 </script>
-<script id="bml-source" type="text/plain">javascript:void((function(){var S='https://harug5152.github.io/ddr-flareskill-simulator/',U='https://ddxzgrknjvxtvcukwngm.supabase.co',K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkeHpncmtuanZ4dHZjdWt3bmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1ODM3MDMsImV4cCI6MjA4OTE1OTcwM30.UjWJWhI6g_j54qpr4okmwmGOna2bA33QGwULv1G-neM',C={flareskill_classic_table:'CLASSIC',flareskill_white_table:'WHITE',flareskill_gold_table:'GOLD'},D={BEGINNER:'b',BASIC:'B',DIFFICULT:'D',EXPERT:'E',CHALLENGE:'C'},st=location.href.includes('flare_data_double')?'DP':'SP',r={CLASSIC:[],WHITE:[],GOLD:[]};function rk(s){if(!s)return 0;if(s.indexOf('flare_ex')>=0)return 10;var m=s.match(/flare_(\d+)/);return m?parseInt(m[1]):0;}for(var cls in C){var cat=C[cls],rows=document.querySelectorAll('tr.'+cls);for(var i=0;i<rows.length;i++){var tds=rows[i].querySelectorAll('td');if(tds.length<4)continue;var name=((tds[0].querySelector('a')||{}).textContent||'不明').trim();if(name.indexOf('Steps to the Star')>=0)continue;var txt=tds[1].textContent,dm=txt.match(/(BEGINNER|BASIC|DIFFICULT|EXPERT|CHALLENGE)/i);if(!dm)continue;var diff=dm[1].toUpperCase();if(!D[diff])continue;var lm=txt.match(/Lv\.?(\d+)/i),level=lm?parseInt(lm[1]):1,img=tds[2].querySelector('img'),ri=rk(img?img.src:''),fs=parseInt((tds[3]||{}).textContent||'0')||0,date=((tds[4]||{}).textContent||'').trim().split(' ')[0]||'0000-00-00';r[cat].push({name:name,diff:diff,style:st,level:level,rankIdx:ri,fs:fs,date:date});}}var tot=r.CLASSIC.length+r.WHITE.length+r.GOLD.length;if(tot===0){alert('フレアスキルデータが見つかりません。\nフレアスキルページで実行してください。');return;}fetch(U+'/rest/v1/skill_data',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K,'Prefer':'return=representation'},body:JSON.stringify({data:r})}).then(function(res){return res.json();}).then(function(d){var uuid=Array.isArray(d)?d[0].uuid:d.uuid;if(!uuid){alert('UUID取得失敗');return;}window.open(S+'?id='+uuid,'_blank');}).catch(function(e){alert('通信エラー: '+e.message);});}()))</script>
+<script id="bml-source" type="text/plain">javascript:void((function(){var S='https://xkamome.github.io/ddr-flareskill-simulator/',U='https://jymhlxunkmwjfknapgis.supabase.co',K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5bWhseHVua213amZrbmFwZ2lzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTE1MDgsImV4cCI6MjA4OTk2NzUwOH0.GO15s-AJRam3r3q0fOJJCt0lsFnymcSCURwbVqldf9c',C={flareskill_classic_table:'CLASSIC',flareskill_white_table:'WHITE',flareskill_gold_table:'GOLD'},D={BEGINNER:'b',BASIC:'B',DIFFICULT:'D',EXPERT:'E',CHALLENGE:'C'},st=location.href.includes('flare_data_double')?'DP':'SP',r={CLASSIC:[],WHITE:[],GOLD:[]};function rk(s){if(!s)return 0;if(s.indexOf('flare_ex')>=0)return 10;var m=s.match(/flare_(\d+)/);return m?parseInt(m[1]):0;}for(var cls in C){var cat=C[cls],rows=document.querySelectorAll('tr.'+cls);for(var i=0;i<rows.length;i++){var tds=rows[i].querySelectorAll('td');if(tds.length<4)continue;var name=((tds[0].querySelector('a')||{}).textContent||'不明').trim();if(name.indexOf('Steps to the Star')>=0)continue;var txt=tds[1].textContent,dm=txt.match(/(BEGINNER|BASIC|DIFFICULT|EXPERT|CHALLENGE)/i);if(!dm)continue;var diff=dm[1].toUpperCase();if(!D[diff])continue;var lm=txt.match(/Lv\.?(\d+)/i),level=lm?parseInt(lm[1]):1,img=tds[2].querySelector('img'),ri=rk(img?img.src:''),fs=parseInt((tds[3]||{}).textContent||'0')||0,date=((tds[4]||{}).textContent||'').trim().split(' ')[0]||'0000-00-00';r[cat].push({name:name,diff:diff,style:st,level:level,rankIdx:ri,fs:fs,date:date});}}var tot=r.CLASSIC.length+r.WHITE.length+r.GOLD.length;if(tot===0){alert('フレアスキルデータが見つかりません。\nフレアスキルページで実行してください。');return;}fetch(U+'/rest/v1/skill_data',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K,'Prefer':'return=representation'},body:JSON.stringify({data:r})}).then(function(res){return res.json();}).then(function(d){var uuid=Array.isArray(d)?d[0].uuid:d.uuid;if(!uuid){alert('UUID取得失敗');return;}window.open(S+'?id='+uuid,'_blank');}).catch(function(e){alert('通信エラー: '+e.message);});}()))</script>
 </body>
 </html>

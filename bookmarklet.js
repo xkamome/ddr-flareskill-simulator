@@ -5,9 +5,9 @@
 // 3. 先頭に javascript:void( 末尾に ) を付けてブックマークに登録
 
 (function () {
-  var SIMULATOR_URL    = 'https://harug5152.github.io/ddr-flareskill-simulator/';
-  var SUPABASE_URL     = 'https://ddxzgrknjvxtvcukwngm.supabase.co';     // TODO
-  var SUPABASE_ANON_KEY= 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkeHpncmtuanZ4dHZjdWt3bmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1ODM3MDMsImV4cCI6MjA4OTE1OTcwM30.UjWJWhI6g_j54qpr4okmwmGOna2bA33QGwULv1G-neM';                // TODO
+  var SIMULATOR_URL    = 'https://xkamome.github.io/ddr-flareskill-simulator/';
+  var SUPABASE_URL     = 'https://jymhlxunkmwjfknapgis.supabase.co';
+  var SUPABASE_ANON_KEY= 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5bWhseHVua213amZrbmFwZ2lzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTE1MDgsImV4cCI6MjA4OTk2NzUwOH0.GO15s-AJRam3r3q0fOJJCt0lsFnymcSCURwbVqldf9c';
   var LS_KEY           = 'ddr_flare_uuid';
 
   // ---- Extract data ----
