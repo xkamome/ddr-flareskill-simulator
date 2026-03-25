@@ -156,6 +156,8 @@ table.st tr.sim-in  td:first-child { border-left: 3px solid #30b060; }
 table.st tr.sim-out td { background: rgba(180,50,50,0.12) !important; opacity: 0.6; text-decoration: line-through; }
 table.st tr.sim-mod td { background: rgba(190,220,40,0.15) !important; }
 table.st tr.sim-mod td:first-child { border-left: 3px solid #b8d828; }
+table.st tr.sim-cand td { background: rgba(40,160,200,0.13) !important; }
+table.st tr.sim-cand td:first-child { border-left: 3px solid #28a0c8; }
 table.st th:nth-child(1), table.st td:nth-child(1) { width: 22px; text-align: right; }
 table.st th:nth-child(2), table.st td:nth-child(2) { width: auto; }
 table.st th:nth-child(3), table.st td:nth-child(3) { width: 36px; }
@@ -1187,27 +1189,26 @@ function buildSimData(withFlags=false) {
       if(withFlags) d[u.cat][idx]._sim='mod';
     }
   });
+  // 候補曲プレビューが有効な場合、候補曲をシミュレーションデータに統合
+  if(candPreviewActive){
+    candidateEntries.forEach(e=>{
+      const existIdx=d[e.cat].findIndex(ex=>ex.id===e.id);
+      if(existIdx>=0){
+        if(e.rankIdx>d[e.cat][existIdx].rankIdx){
+          d[e.cat][existIdx].rankIdx=e.rankIdx;
+          d[e.cat][existIdx].fs=e.fs;
+          d[e.cat][existIdx].date=today;
+          if(withFlags) d[e.cat][existIdx]._sim=d[e.cat][existIdx]._sim||'cand';
+        }
+      } else {
+        const entry={...e,date:today};
+        if(withFlags) entry._sim='cand';
+        d[e.cat].push(entry);
+      }
+    });
+  }
   // noteEditsを全エントリに適用
   CATS.forEach(cat=>{ d[cat].forEach(e=>{ if(noteEdits[e.id]!==undefined) e.note=noteEdits[e.id]; }); });
-  return d;
-}
-
-function buildCandPreviewData() {
-  const d = buildSimData();
-  const today = new Date().toISOString().slice(0, 10);
-  candidateEntries.forEach(e => {
-    const existIdx = d[e.cat].findIndex(ex => ex.id === e.id);
-    if (existIdx >= 0) {
-      if (e.rankIdx > d[e.cat][existIdx].rankIdx) {
-        d[e.cat][existIdx].rankIdx = e.rankIdx;
-        d[e.cat][existIdx].fs = e.fs;
-        d[e.cat][existIdx].date = today;
-        d[e.cat][existIdx]._candPrev = true;
-      }
-    } else {
-      d[e.cat].push({...e, date: today, _candPrev: true});
-    }
-  });
   return d;
 }
 
@@ -1251,7 +1252,7 @@ function renderTable(cat){
 
   document.getElementById(`fs-${cat.toLowerCase()}`).textContent=newTotal.toLocaleString();
   const dEl=document.getElementById(`d-${cat.toLowerCase()}`);
-  if(hasSimActive()&&delta!==0){
+  if((hasSimActive()||candPreviewActive)&&delta!==0){
     dEl.textContent=dStr(delta);
     dEl.style.color=delta>0?'#48d898':'#d84848';
   } else { dEl.textContent=''; }
@@ -1268,6 +1269,7 @@ function renderTable(cat){
       if(showSimColors&&updIds.has(e.id)) cls='sim-mod row-clickable';
       else if(showSimColors&&e._sim==='new') cls='sim-in row-clickable';
       else if(showSimColors&&e._sim==='mod') cls='sim-mod row-clickable';
+      else if(showSimColors&&e._sim==='cand') cls='sim-cand row-clickable';
       onclick=`onclick="selectRowForUpdate('${cat}','${esc(e.id)}')"`;
     }
     const hasNote=!!(noteEdits[e.id]!==undefined?noteEdits[e.id]:e.note);
@@ -1445,7 +1447,7 @@ function renderSimResult(){
 }
 
 function buildStatsHtml(){
-  const simD=hasSimActive()?buildSimData():null;
+  const simD=(hasSimActive()||candPreviewActive)?buildSimData():null;
   function dist(data,cat){
     const d={};
     top30(data[cat]).forEach(e=>{const k=`Lv${e.level} ${RANK_NAMES[e.rankIdx]}`;d[k]=(d[k]||0)+1;});
@@ -2001,9 +2003,7 @@ function toggleCandPreview(){
   const btn = document.getElementById('btn-cand-preview');
   if(btn) btn.classList.toggle('active', candPreviewActive);
   if(btn) btn.textContent = candPreviewActive ? '全候補プレビュー ✕' : '全候補をプレビュー ▶';
-  renderCandPreview();
-  // 候補曲テーブルの行に視覚的な強調を付ける
-  document.querySelectorAll('.cand-section').forEach(s=>s.classList.toggle('cand-prev-on', candPreviewActive));
+  render();
 }
 function renderCandPreview(){
   const el = document.getElementById('cand-preview-result');
@@ -2013,38 +2013,10 @@ function renderCandPreview(){
     return;
   }
   el.style.display = '';
-  const baseData = hasSimActive() ? buildSimData() : skillData;
-  const base = grandTotal(baseData);
-  const withCands = grandTotal(buildCandPreviewData());
-  const delta = withCands - base;
-  const rankBase = getRank(base);
-  const rankNew  = getRank(withCands);
-  const rankUp   = rankBase.name !== rankNew.name || rankBase.sub !== rankNew.sub;
-  // カテゴリ別の変化
-  const catRows = CATS.map(cat=>{
-    const b = catTotal(baseData[cat]);
-    const n = catTotal(buildCandPreviewData()[cat]);
-    const d = n - b;
-    if(d === 0) return '';
-    return `<span style="font-size:10px;color:#404060;">${cat} <span class="${dCls(d)}">${dStr(d)}</span></span>`;
-  }).filter(Boolean).join('<span style="color:#252540;margin:0 4px;">|</span>');
-  el.innerHTML = `
-    <div class="cprev-header">CANDIDATE PREVIEW — ${candidateEntries.length} 曲</div>
-    <div class="cprev-row">
-      <div class="cprev-block">
-        <div class="cprev-lbl">現在</div>
-        <div class="cprev-val cprev-base">${base.toLocaleString()}</div>
-      </div>
-      <div class="cprev-arrow">→</div>
-      <div class="cprev-block">
-        <div class="cprev-lbl">全候補達成後</div>
-        <div class="cprev-val cprev-new">${withCands.toLocaleString()}</div>
-      </div>
-      <div class="cprev-delta ${dCls(delta)}">${dStr(delta)}</div>
-      ${rankUp ? `<div class="cprev-rank">🎉 ${fmtRank(rankBase)} → ${fmtRank(rankNew)}</div>` : ''}
-    </div>
-    ${catRows ? `<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">${catRows}</div>` : ''}
-  `;
+  el.innerHTML = `<div class="cprev-header" style="display:flex;align-items:center;gap:6px;">
+    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#28a0c8;"></span>
+    CANDIDATE PREVIEW 有効 — ${candidateEntries.length} 曲をシミュレーションに追加中
+  </div>`;
 }
 function refreshUpdateSongs(){
   const cat=document.getElementById('u-cat').value;
