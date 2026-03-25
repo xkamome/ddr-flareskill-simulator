@@ -47,9 +47,3 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Notify Discord
-        if: always()
-        run: |
-          curl -H "Content-Type: application/json" \
-               -d "{\"content\": \"GitHub Pages デプロイ結果: ${{ job.status }}\"}" \
-               ${{ secrets.DISCORD_WEBHOOK_URL }}
